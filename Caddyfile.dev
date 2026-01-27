@@ -1,0 +1,28 @@
+{
+	# Local admin API
+	admin localhost:2019
+
+	# Debug logging
+	debug
+
+	# Configure certmatic
+	certmatic {
+		config certmatic.dev.yaml
+	}
+
+	local_certs
+}
+
+# Internal ask endpoint
+:5555 {
+	route /foo {
+		certmatic_foo "bar"
+	}
+
+	# Health check
+	route /health {
+		respond "OK" 200
+	}
+
+    respond "not found" 404
+}
