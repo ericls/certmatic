@@ -1,12 +1,14 @@
 package caddy
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
+	"go.uber.org/zap"
 )
 
 type FooHandler struct {
@@ -51,9 +53,12 @@ type App struct {
 	ConfigPath string `json:"config_path,omitempty"`
 
 	Foo string `json:"foo,omitempty"`
+
+	Logger zap.Logger `json:"-"`
 }
 
 func (App) CaddyModule() caddy.ModuleInfo {
+	fmt.Println("Registering Certmatic App Module")
 	return caddy.ModuleInfo{
 		ID:  "certmatic",
 		New: func() caddy.Module { return new(App) },
@@ -70,6 +75,15 @@ func (a *App) Stop() error {
 
 // Provision implements caddy.Provisioner.
 func (a *App) Provision(ctx caddy.Context) error {
+	a.Logger = *ctx.Logger(a)
+	a.Logger.Debug("provisioning certmatic app", zap.String("config_path", a.ConfigPath))
+	storage := ctx.Storage()
+	// storage.
+	keys, err := storage.List(ctx, "", true)
+	if err != nil {
+		return nil
+	}
+	a.Logger.Debug("storage keys", zap.Int("count", len(keys)), zap.Strings("keys", keys))
 	return nil
 }
 
@@ -83,6 +97,11 @@ func (a *App) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 					return d.ArgErr()
 				}
 				a.ConfigPath = d.Val()
+			case "foo":
+				if !d.NextArg() {
+					return d.ArgErr()
+				}
+				a.Foo = d.Val()
 			default:
 				return d.Errf("unrecognized certmatic option: %s", d.Val())
 			}

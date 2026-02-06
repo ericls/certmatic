@@ -24,5 +24,13 @@
 		respond "OK" 200
 	}
 
-    respond "not found" 404
+	respond "not found" 404
+}
+
+:8443 {
+	tls internal {
+		on_demand
+	}
+	# return the host name in the body
+	respond "{http.request.host}" 200
 }
