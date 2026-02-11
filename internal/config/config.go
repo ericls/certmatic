@@ -4,9 +4,7 @@ import "encoding/json"
 
 type StorageType string
 
-const StorageTypeFile StorageType = "file"
 const StorageTypeMemory StorageType = "memory"
-const StorageTypeS3 StorageType = "s3"
 const StorageTypePostgres StorageType = "postgres"
 const StorageTypeSqlite StorageType = "sqlite"
 
@@ -28,34 +26,21 @@ func (s *Store) GetDomainStoreType() StorageType {
 	return getValidatedStorageType(s.Type, []StorageType{StorageTypeMemory, StorageTypePostgres, StorageTypeSqlite})
 }
 
-func (s *Store) GetCertificateStoreType() StorageType {
-	return getValidatedStorageType(s.Type, []StorageType{StorageTypeFile, StorageTypeS3, StorageTypeMemory})
-}
-
 // Config represents the configuration for Certmatic.
 type Config struct {
 	DomainStores []Store `json:"domain_stores,omitempty"`
-	CertStores   []Store `json:"cert_stores,omitempty"`
-}
-
-type FileStorageConfig struct {
-	RootPath string `json:"root_path,omitempty"`
-}
-
-type S3StorageConfig struct {
-	BucketName string `json:"bucket_name,omitempty"`
-	Prefix     string `json:"prefix,omitempty"`
-	AccessKey  string `json:"access_key,omitempty"`
-	SecretKey  string `json:"secret_key,omitempty"`
-
-	// Endpoint is optional; if not set, the default AWS endpoint for the region will be used.
-	Endpoint string `json:"endpoint,omitempty"`
-	// Region is ignored iif Endpoint is set
-	Region string `json:"region,omitempty"`
 }
 
 type InmemoryStorageConfig struct {
 	// No specific config needed for in-memory storage
+}
+
+type PostgresStorageConfig struct {
+	ConnectionString string `json:"connection_string,omitempty"`
+}
+
+type SqliteStorageConfig struct {
+	FilePath string `json:"file_path,omitempty"`
 }
 
 func getTypedStorageConfig[T any](rawConfig map[string]any) (*T, error) {
@@ -74,14 +59,14 @@ func getTypedStorageConfig[T any](rawConfig map[string]any) (*T, error) {
 	return &typedConfig, nil
 }
 
-func AsFileStorageConfig(rawConfig map[string]any) (*FileStorageConfig, error) {
-	return getTypedStorageConfig[FileStorageConfig](rawConfig)
-}
-
-func AsS3StorageConfig(rawConfig map[string]any) (*S3StorageConfig, error) {
-	return getTypedStorageConfig[S3StorageConfig](rawConfig)
-}
-
 func AsInmemoryStorageConfig(rawConfig map[string]any) (*InmemoryStorageConfig, error) {
 	return getTypedStorageConfig[InmemoryStorageConfig](rawConfig)
+}
+
+func AsPostgresStorageConfig(rawConfig map[string]any) (*PostgresStorageConfig, error) {
+	return getTypedStorageConfig[PostgresStorageConfig](rawConfig)
+}
+
+func AsSqliteStorageConfig(rawConfig map[string]any) (*SqliteStorageConfig, error) {
+	return getTypedStorageConfig[SqliteStorageConfig](rawConfig)
 }

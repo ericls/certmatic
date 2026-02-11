@@ -1,64 +1,66 @@
 package caddy
 
 import (
-	"fmt"
-	"net/http"
+	"context"
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
-	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
+	"github.com/caddyserver/caddy/v2/modules/caddyevents"
+	"github.com/ericls/certmatic/internal/config"
+	internal_domain "github.com/ericls/certmatic/internal/repo/domain"
+	"github.com/ericls/certmatic/pkg/domain"
 	"go.uber.org/zap"
 )
 
-type FooHandler struct {
-	Bar string `json:"bar,omitempty"`
-}
+// type FooHandler struct {
+// 	Bar string `json:"bar,omitempty"`
+// }
 
-func (FooHandler) CaddyModule() caddy.ModuleInfo {
-	return caddy.ModuleInfo{
-		ID:  "http.handlers.certmatic_foo",
-		New: func() caddy.Module { return new(FooHandler) },
-	}
-}
+// func (FooHandler) CaddyModule() caddy.ModuleInfo {
+// 	return caddy.ModuleInfo{
+// 		ID:  "http.handlers.certmatic_foo",
+// 		New: func() caddy.Module { return new(FooHandler) },
+// 	}
+// }
 
-func (h *FooHandler) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
-	w.WriteHeader(http.StatusOK)
-	w.Header().Set("Content-Type", "text/plain")
-	w.Header().Set("X-Foo", "Bar")
-	w.Write([]byte("FooHandler: " + h.Bar + "\n"))
-	return nil
-}
+// func (h *FooHandler) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
+// 	w.WriteHeader(http.StatusOK)
+// 	w.Header().Set("Content-Type", "text/plain")
+// 	w.Header().Set("X-Foo", "Bar")
+// 	w.Write([]byte("FooHandler: " + h.Bar + "\n"))
+// 	return nil
+// }
 
-func parseCaddyfileAsk(d httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error) {
-	h := &FooHandler{
-		Bar: "default",
-	}
-	d.NextArg()
-	if d.NextArg() {
-		h.Bar = d.Val()
-	}
-	return h, nil
-}
+// func parseCaddyfileAsk(d httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error) {
+// 	h := &FooHandler{
+// 		Bar: "default",
+// 	}
+// 	d.NextArg()
+// 	if d.NextArg() {
+// 		h.Bar = d.Val()
+// 	}
+// 	return h, nil
+// }
 
 func init() {
 	caddy.RegisterModule(App{})
 	httpcaddyfile.RegisterGlobalOption("certmatic", parseGlobalCertmatic)
-	caddy.RegisterModule(FooHandler{})
-	httpcaddyfile.RegisterHandlerDirective("certmatic_foo", parseCaddyfileAsk)
+	// caddy.RegisterModule(FooHandler{})
+	// httpcaddyfile.RegisterHandlerDirective("certmatic_foo", parseCaddyfileAsk)
 }
 
-// App is the certmatic Caddy app that manages domain resolution.
 type App struct {
-	ConfigPath string `json:"config_path,omitempty"`
+	DomainStore config.Store `json:"domain_store,omitempty"`
 
-	Foo string `json:"foo,omitempty"`
+	// Foo string `json:"foo,omitempty"`
 
-	Logger zap.Logger `json:"-"`
+	logger     zap.Logger        `json:"-"`
+	config     config.Config     `json:"-"`
+	domainRepo domain.DomainRepo `json:"-"`
 }
 
 func (App) CaddyModule() caddy.ModuleInfo {
-	fmt.Println("Registering Certmatic App Module")
 	return caddy.ModuleInfo{
 		ID:  "certmatic",
 		New: func() caddy.Module { return new(App) },
@@ -66,6 +68,13 @@ func (App) CaddyModule() caddy.ModuleInfo {
 }
 
 func (a *App) Start() error {
+	domainRepo, err := internal_domain.NewDomainStoreFromConfig(a.DomainStore)
+	if err != nil {
+		a.logger.Error("failed to create domain store from config", zap.Error(err))
+		return err
+	}
+	a.domainRepo = domainRepo
+	a.logger.Debug("certmatic app started with domain store", zap.String("store_type", a.DomainStore.Type))
 	return nil
 }
 
@@ -75,38 +84,31 @@ func (a *App) Stop() error {
 
 // Provision implements caddy.Provisioner.
 func (a *App) Provision(ctx caddy.Context) error {
-	a.Logger = *ctx.Logger(a)
-	a.Logger.Debug("provisioning certmatic app", zap.String("config_path", a.ConfigPath))
+	a.logger = *ctx.Logger(a)
+	a.logger.Debug("provisioning certmatic app")
+	evts, err := ctx.App("events")
+	if err != nil {
+		a.logger.Error("failed to get events app", zap.Error(err))
+		return err
+	}
+	events_app := evts.(*caddyevents.App)
+	events_app.Subscribe(&caddyevents.Subscription{
+		Events:   []string{"cert_obtaining", "cert_obtained", "cert_failed"},
+		Modules:  []caddy.ModuleID{"tls"}, // optional: filter by origin module
+		Handlers: []caddyevents.Handler{a},
+	})
 	storage := ctx.Storage()
 	// storage.
 	keys, err := storage.List(ctx, "", true)
 	if err != nil {
-		return nil
+		return err
 	}
-	a.Logger.Debug("storage keys", zap.Int("count", len(keys)), zap.Strings("keys", keys))
+	a.logger.Debug("storage keys", zap.Int("count", len(keys)), zap.Strings("keys", keys))
 	return nil
 }
 
-// UnmarshalCaddyfile implements caddyfile.Unmarshaler.
-func (a *App) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
-	for d.Next() {
-		for d.NextBlock(0) {
-			switch d.Val() {
-			case "config":
-				if !d.NextArg() {
-					return d.ArgErr()
-				}
-				a.ConfigPath = d.Val()
-			case "foo":
-				if !d.NextArg() {
-					return d.ArgErr()
-				}
-				a.Foo = d.Val()
-			default:
-				return d.Errf("unrecognized certmatic option: %s", d.Val())
-			}
-		}
-	}
+func (a *App) Handle(ctx context.Context, event caddy.Event) error {
+	a.logger.Info("received event", zap.String("event", event.Name()), zap.String("origin", string(event.Origin().CaddyModule().ID)))
 	return nil
 }
 
@@ -114,4 +116,5 @@ var (
 	_ caddy.App             = (*App)(nil)
 	_ caddy.Provisioner     = (*App)(nil)
 	_ caddyfile.Unmarshaler = (*App)(nil)
+	_ caddyevents.Handler   = (*App)(nil)
 )

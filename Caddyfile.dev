@@ -7,30 +7,14 @@
 
 	# Configure certmatic
 	certmatic {
-		config certmatic.dev.yaml
+		domain_store memory
 	}
 
 	local_certs
 }
 
 # Internal ask endpoint
-:5555 {
-	route /foo {
-		certmatic_foo "bar"
-	}
-
-	# Health check
-	route /health {
-		respond "OK" 200
-	}
-
-	respond "not found" 404
-}
-
 :8443 {
-	tls internal {
-		on_demand
-	}
 	# return the host name in the body
 	respond "{http.request.host}" 200
 }
