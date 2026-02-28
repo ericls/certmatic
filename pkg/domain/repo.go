@@ -17,7 +17,7 @@ type DomainRepo interface {
 	Get(ctx context.Context, hostname string) (*StoredDomain, error)
 	Set(ctx context.Context, domain *Domain) error
 	Delete(ctx context.Context, hostname string) error
-	Invalidate(ctx context.Context, hostname string) error
+	// Invalidate(ctx context.Context, hostname string) error
 }
 
 type ReadOnlyDomainRepo interface {

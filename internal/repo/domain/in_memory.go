@@ -69,10 +69,10 @@ func (repo *InMemoryDomainRepo) Delete(ctx context.Context, hostname string) err
 }
 
 // Invalidate marks a domain as invalid/stale by removing it.
-func (repo *InMemoryDomainRepo) Invalidate(ctx context.Context, hostname string) error {
-	repo.mu.Lock()
-	defer repo.mu.Unlock()
+// func (repo *InMemoryDomainRepo) Invalidate(ctx context.Context, hostname string) error {
+// 	repo.mu.Lock()
+// 	defer repo.mu.Unlock()
 
-	delete(repo.domains, hostname)
-	return nil
-}
+// 	delete(repo.domains, hostname)
+// 	return nil
+// }

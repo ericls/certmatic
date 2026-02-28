@@ -2,8 +2,6 @@ package domain
 
 import (
 	"errors"
-	"maps"
-	"strings"
 )
 
 var (
@@ -19,7 +17,7 @@ type Domain struct {
 
 	OwnershipVerified bool `json:"ownership_verified" yaml:"ownership_verified"`
 
-	Metadata map[string]string `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	// Metadata map[string]string `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 }
 
 func (d *Domain) Clone() *Domain {
@@ -27,16 +25,9 @@ func (d *Domain) Clone() *Domain {
 		return nil
 	}
 	clone := *d
-	if d.Metadata != nil {
-		clone.Metadata = make(map[string]string, len(d.Metadata))
-		maps.Copy(clone.Metadata, d.Metadata)
-	}
+	// if d.Metadata != nil {
+	// 	clone.Metadata = make(map[string]string, len(d.Metadata))
+	// 	maps.Copy(clone.Metadata, d.Metadata)
+	// }
 	return &clone
-}
-
-func (d *Domain) IsETLDPlusOne() bool {
-	// TODO: !!!before-release. Use public suffix list to implement this properly
-	// In some systems, this is referred to as "root domain", "apex domain", or "base domain".
-	segments := strings.Split(d.Hostname, ".")
-	return len(segments) == 2
 }
