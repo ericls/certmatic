@@ -6,25 +6,23 @@ import (
 	"github.com/ericls/certmatic/internal/dns"
 	"github.com/ericls/certmatic/pkg/domain"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 )
 
 type DomainAdminEndpoint struct {
-	dbRepo           domain.DomainRepo
+	domainRepo       domain.DomainRepo
 	DNSRecordManager *dns.DNSRecordManager
 }
 
 func NewDomainAdminEndpoint(dbRepo domain.DomainRepo, dnsRecordManager *dns.DNSRecordManager) *DomainAdminEndpoint {
-	return &DomainAdminEndpoint{dbRepo: dbRepo, DNSRecordManager: dnsRecordManager}
+	return &DomainAdminEndpoint{domainRepo: dbRepo, DNSRecordManager: dnsRecordManager}
 }
 
 func (e *DomainAdminEndpoint) BuildDomainAdminRouter() chi.Router {
 	r := chi.NewRouter()
-	r.Route("/<hostname>", func(r chi.Router) {
+	r.Route("/{hostname}", func(r chi.Router) {
 		r.Post("/set", e.makeSetDomainHandler())
 		r.Get("/get", e.makeGetDomainHandler())
 	})
-	r.Use(middleware.Logger)
 	return r
 }
 
@@ -50,7 +48,7 @@ func (e *DomainAdminEndpoint) makeSetDomainHandler() http.HandlerFunc {
 	return JSONHandler(http.StatusOK, func(r *http.Request, body SetDomainRequest) (SetDomainResponse, error) {
 		hostname := chi.URLParam(r, "hostname")
 		var d *domain.Domain
-		maybeDomain, err := e.dbRepo.Get(r.Context(), hostname)
+		maybeDomain, err := e.domainRepo.Get(r.Context(), hostname)
 		// if error is domain.ErrNotFound, then create a new domain. Otherwise return error
 		if err == domain.ErrNotFound {
 			d = &domain.Domain{
@@ -67,7 +65,7 @@ func (e *DomainAdminEndpoint) makeSetDomainHandler() http.HandlerFunc {
 		if body.OwnershipVerified != nil {
 			d.OwnershipVerified = *body.OwnershipVerified
 		}
-		err = e.dbRepo.Set(r.Context(), d)
+		err = e.domainRepo.Set(r.Context(), d)
 		if err != nil {
 			return SetDomainResponse{}, err
 		}
@@ -87,11 +85,16 @@ type GetDomainResponse = SerializedDomain
 func (e *DomainAdminEndpoint) makeGetDomainHandler() http.HandlerFunc {
 	return JSONHandler(http.StatusOK, func(r *http.Request, _ struct{}) (GetDomainResponse, error) {
 		hostname := chi.URLParam(r, "hostname")
-		domain, err := e.dbRepo.Get(r.Context(), hostname)
-		if err != nil {
+		sd, err := e.domainRepo.Get(r.Context(), hostname)
+		if err == domain.ErrNotFound {
+			return GetDomainResponse{}, HTTPError{
+				Status:  http.StatusNotFound,
+				Message: "domain not found",
+			}
+		} else if err != nil {
 			return GetDomainResponse{}, err
 		}
-		d := domain.Domain
+		d := sd.Domain
 		return GetDomainResponse{
 			BaseDomainResponse: BaseDomainResponse{
 				Hostname:          d.Hostname,

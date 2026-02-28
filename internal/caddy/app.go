@@ -8,6 +8,7 @@ import (
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyevents"
 	"github.com/ericls/certmatic/internal/config"
+	"github.com/ericls/certmatic/internal/dns"
 	internal_domain "github.com/ericls/certmatic/internal/repo/domain"
 	"github.com/ericls/certmatic/pkg/domain"
 	"go.uber.org/zap"
@@ -43,6 +44,8 @@ import (
 // 	return h, nil
 // }
 
+var usagePool = caddy.NewUsagePool()
+
 func init() {
 	caddy.RegisterModule(App{})
 	httpcaddyfile.RegisterGlobalOption("certmatic", parseGlobalCertmatic)
@@ -51,13 +54,17 @@ func init() {
 }
 
 type App struct {
-	DomainStore config.Store `json:"domain_store,omitempty"`
+	DomainStore         config.Store      `json:"domain_store,omitempty"`
+	ChallengeType       dns.ChallengeType `json:"challenge_type,omitempty"`
+	DNSDelegationDomain string            `json:"dns_delegation_domain,omitempty"`
+	CNameTarget         string            `json:"cname_target,omitempty"`
 
 	// Foo string `json:"foo,omitempty"`
 
-	logger     zap.Logger        `json:"-"`
-	config     config.Config     `json:"-"`
-	domainRepo domain.DomainRepo `json:"-"`
+	logger           zap.Logger            `json:"-"`
+	config           config.Config         `json:"-"`
+	domainRepo       domain.DomainRepo     `json:"-"`
+	dnsRecordManager *dns.DNSRecordManager `json:"-"`
 }
 
 func (App) CaddyModule() caddy.ModuleInfo {
@@ -68,13 +75,13 @@ func (App) CaddyModule() caddy.ModuleInfo {
 }
 
 func (a *App) Start() error {
-	domainRepo, err := internal_domain.NewDomainStoreFromConfig(a.DomainStore)
-	if err != nil {
-		a.logger.Error("failed to create domain store from config", zap.Error(err))
-		return err
-	}
-	a.domainRepo = domainRepo
-	a.logger.Debug("certmatic app started with domain store", zap.String("store_type", a.DomainStore.Type))
+	a.logger.Debug(
+		"certmatic app started with",
+		zap.String("store_type", a.DomainStore.Type),
+		zap.String("challenge_type", string(a.ChallengeType)),
+		zap.String("dns_delegation_domain", a.DNSDelegationDomain),
+		zap.String("cname_target", a.CNameTarget),
+	)
 	return nil
 }
 
@@ -86,24 +93,34 @@ func (a *App) Stop() error {
 func (a *App) Provision(ctx caddy.Context) error {
 	a.logger = *ctx.Logger(a)
 	a.logger.Debug("provisioning certmatic app")
-	evts, err := ctx.App("events")
-	if err != nil {
-		a.logger.Error("failed to get events app", zap.Error(err))
-		return err
-	}
-	events_app := evts.(*caddyevents.App)
-	events_app.Subscribe(&caddyevents.Subscription{
-		Events:   []string{"cert_obtaining", "cert_obtained", "cert_failed"},
-		Modules:  []caddy.ModuleID{"tls"}, // optional: filter by origin module
-		Handlers: []caddyevents.Handler{a},
+	// evts, err := ctx.App("events")
+	// if err != nil {
+	// 	a.logger.Error("failed to get events app", zap.Error(err))
+	// 	return err
+	// }
+	// events_app := evts.(*caddyevents.App)
+	// events_app.Subscribe(&caddyevents.Subscription{
+	// 	Events:   []string{"cert_obtaining", "cert_obtained", "cert_failed"},
+	// 	Modules:  []caddy.ModuleID{"tls"}, // optional: filter by origin module
+	// 	Handlers: []caddyevents.Handler{a},
+	// })
+	// storage := ctx.Storage()
+	// keys, err := storage.List(ctx, "", true)
+	// if err != nil {
+	// 	return err
+	// }
+	// a.logger.Debug("storage keys", zap.Int("count", len(keys)), zap.Strings("keys", keys))
+	domainRepo, _, err := usagePool.LoadOrNew("domainRepo", func() (caddy.Destructor, error) {
+		return internal_domain.NewDomainStoreFromConfig(a.DomainStore)
 	})
-	storage := ctx.Storage()
-	// storage.
-	keys, err := storage.List(ctx, "", true)
+	// domainRepo, err := internal_domain.NewDomainStoreFromConfig(a.DomainStore)
 	if err != nil {
+		a.logger.Error("failed to create or load domain store from config", zap.Error(err))
 		return err
 	}
-	a.logger.Debug("storage keys", zap.Int("count", len(keys)), zap.Strings("keys", keys))
+	a.domainRepo = domainRepo.(domain.DomainRepo)
+	dnsRecordManager := dns.NewDNSRecordManager(a.ChallengeType, a.DNSDelegationDomain, a.CNameTarget)
+	a.dnsRecordManager = dnsRecordManager
 	return nil
 }
 

@@ -76,3 +76,8 @@ func (repo *InMemoryDomainRepo) Delete(ctx context.Context, hostname string) err
 // 	delete(repo.domains, hostname)
 // 	return nil
 // }
+
+// Destruct closes the repo and releases any resources. For in-memory repo, there's nothing to do.
+func (repo *InMemoryDomainRepo) Destruct() error {
+	return nil
+}

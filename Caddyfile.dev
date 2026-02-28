@@ -8,13 +8,24 @@
 	# Configure certmatic
 	certmatic {
 		domain_store memory
+		challenge_type http-01
+		# challenge_type dns-01
+		# dns_delegation_domain _acme-challenge.example.com
+		cname_target dispatcher.linki.la
 	}
 
 	local_certs
 }
 
-# Internal ask endpoint
+# sanity check
 :8443 {
 	# return the host name in the body
 	respond "{http.request.host}" 200
+}
+
+# certmatic admin endpoint
+:33001 {
+	handle_path /admin/* {
+		certmatic_admin
+	}
 }

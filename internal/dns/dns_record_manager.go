@@ -61,7 +61,7 @@ func (m *DNSRecordManager) getPointingRecord(hostname string) (domain.DNSRecord,
 	if useCName {
 		return domain.DNSRecord{
 			Type:  "CNAME",
-			Name:  m.dnsDelegationDomain,
+			Name:  hostname,
 			Value: m.cNameTarget,
 		}, nil
 	}
@@ -71,7 +71,7 @@ func (m *DNSRecordManager) getPointingRecord(hostname string) (domain.DNSRecord,
 	}
 	return domain.DNSRecord{
 		Type:  "A",
-		Name:  m.dnsDelegationDomain,
+		Name:  hostname,
 		Value: ip.String(),
 	}, nil
 }

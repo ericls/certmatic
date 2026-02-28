@@ -7,6 +7,7 @@ import (
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/ericls/certmatic/internal/config"
+	"github.com/ericls/certmatic/internal/dns"
 )
 
 func (a *App) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
@@ -37,6 +38,35 @@ func (a *App) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 				} else {
 					return d.Errf("invalid domain store config: %s. Expected 'memory', 'postgres://...' or 'sqlite://...'", val)
 				}
+			case "challenge_type":
+				if !d.NextArg() {
+					return d.ArgErr()
+				}
+				val := d.Val()
+				switch val {
+				case "http-01":
+					a.ChallengeType = dns.ChallengeTypeHTTP01
+				case "":
+					a.ChallengeType = dns.ChallengeTypeHTTP01
+				case "dns-01":
+					a.ChallengeType = dns.ChallengeTypeDNS01
+				default:
+					return d.Errf("invalid challenge type: %s. Expected 'http-01' or 'dns-01'", val)
+				}
+			case "dns_delegation_domain":
+				if !d.NextArg() {
+					return d.ArgErr()
+				}
+				a.DNSDelegationDomain = d.Val()
+			case "cname_target":
+				if !d.NextArg() {
+					return d.ArgErr()
+				}
+				val := d.Val()
+				if val == "" {
+					return d.Errf("cname_target cannot be empty")
+				}
+				a.CNameTarget = val
 			default:
 				return d.Errf("unrecognized certmatic option: %s", d.Val())
 			}

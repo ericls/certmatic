@@ -18,6 +18,8 @@ type DomainRepo interface {
 	Set(ctx context.Context, domain *Domain) error
 	Delete(ctx context.Context, hostname string) error
 	// Invalidate(ctx context.Context, hostname string) error
+
+	Destruct() error
 }
 
 type ReadOnlyDomainRepo interface {

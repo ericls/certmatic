@@ -57,17 +57,21 @@ func (e HTTPError) Error() string { return e.Message }
 
 func JSONHandler[TReq any, TRes any](statusOnOK int, handler JSONHandlerFunc[TReq, TRes]) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		method := r.Method
+		shouldRequestHaveBody := method == http.MethodPost || method == http.MethodPut || method == http.MethodPatch
 		var body TReq
-		if err := decodeJSON(r, &body); err != nil {
-			var validationErrs validator.ValidationErrors
-			if errors.As(err, &validationErrs) {
-				writeJSON(w, http.StatusUnprocessableEntity, ValidationErrorResponse{
-					Errors: formatValidationErrors(validationErrs),
-				})
+		if shouldRequestHaveBody {
+			if err := decodeJSON(r, &body); err != nil {
+				var validationErrs validator.ValidationErrors
+				if errors.As(err, &validationErrs) {
+					writeJSON(w, http.StatusUnprocessableEntity, ValidationErrorResponse{
+						Errors: formatValidationErrors(validationErrs),
+					})
+					return
+				}
+				writeError(w, http.StatusBadRequest, "invalid request body")
 				return
 			}
-			writeError(w, http.StatusBadRequest, "invalid request body")
-			return
 		}
 
 		res, err := handler(r, body)
