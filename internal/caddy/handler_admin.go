@@ -9,7 +9,6 @@ import (
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	"github.com/ericls/certmatic/internal/endpoint"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 	"go.uber.org/zap"
 )
 
@@ -45,15 +44,9 @@ func (h *AdminHandler) Provision(ctx caddy.Context) error {
 	}
 	h.logger = h.app.logger.With(zap.String("module", "admin_handler"))
 	h.logger.Info("provisioning admin handler")
-	router := chi.NewRouter()
-	h.router = router
-	router.Use(middleware.RequestLogger(&ZapFormatter{Logger: h.logger}))
-	router.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
-	})
-	domainRouter := endpoint.NewDomainAdminEndpoint(h.app.domainRepo, h.app.dnsRecordManager).BuildDomainAdminRouter()
-	router.Mount("/domain", domainRouter)
+	adminRouter := endpoint.MakeAdminRouter(h.app.domainRepo, h.app.dnsRecordManager, h.logger)
+	h.router = chi.NewRouter()
+	h.router.Mount("/", adminRouter)
 	return nil
 }
 

@@ -13,7 +13,7 @@ type DomainAdminEndpoint struct {
 	DNSRecordManager *dns.DNSRecordManager
 }
 
-func NewDomainAdminEndpoint(dbRepo domain.DomainRepo, dnsRecordManager *dns.DNSRecordManager) *DomainAdminEndpoint {
+func newDomainAdminEndpoint(dbRepo domain.DomainRepo, dnsRecordManager *dns.DNSRecordManager) *DomainAdminEndpoint {
 	return &DomainAdminEndpoint{domainRepo: dbRepo, DNSRecordManager: dnsRecordManager}
 }
 
