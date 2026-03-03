@@ -20,8 +20,10 @@ func newDomainAdminEndpoint(dbRepo domain.DomainRepo, dnsRecordManager *dns.DNSR
 func (e *DomainAdminEndpoint) BuildDomainAdminRouter() chi.Router {
 	r := chi.NewRouter()
 	r.Route("/{hostname}", func(r chi.Router) {
-		r.Post("/set", e.makeSetDomainHandler())
-		r.Get("/get", e.makeGetDomainHandler())
+		r.Get("/", e.handleGetDomain())
+		r.Put("/", e.handleUpsertDomain())
+		r.Post("/", e.handleUpsertDomain())
+		r.Delete("/", e.handleDeleteDomain())
 	})
 	return r
 }
@@ -32,30 +34,27 @@ type BaseDomainResponse struct {
 	OwnershipVerified bool   `json:"ownership_verified" yaml:"ownership_verified"`
 }
 
-type SetDomainRequest struct {
+type UpsertDomainRequest struct {
 	TenantID          *string `json:"tenant_id,omitempty" yaml:"tenant_id,omitempty"`
-	OwnershipVerified *bool   `json:"ownership_verified" yaml:"ownership_verified"`
+	OwnershipVerified *bool   `json:"ownership_verified,omitempty" yaml:"ownership_verified,omitempty"`
 }
 
-type SerializedDomain struct {
+type DomainResponse struct {
 	BaseDomainResponse
 	RequiredDNSRecords []domain.DNSRecord `json:"required_dns_records,omitempty" yaml:"required_dns_records,omitempty"`
 }
 
-type SetDomainResponse = SerializedDomain
-
-func (e *DomainAdminEndpoint) makeSetDomainHandler() http.HandlerFunc {
-	return JSONHandler(http.StatusOK, func(r *http.Request, body SetDomainRequest) (SetDomainResponse, error) {
+func (e *DomainAdminEndpoint) handleUpsertDomain() http.HandlerFunc {
+	return JSONHandler(http.StatusOK, func(r *http.Request, body UpsertDomainRequest) (DomainResponse, error) {
 		hostname := chi.URLParam(r, "hostname")
 		var d *domain.Domain
 		maybeDomain, err := e.domainRepo.Get(r.Context(), hostname)
-		// if error is domain.ErrNotFound, then create a new domain. Otherwise return error
 		if err == domain.ErrNotFound {
 			d = &domain.Domain{
 				Hostname: hostname,
 			}
 		} else if err != nil {
-			return SetDomainResponse{}, err
+			return DomainResponse{}, err
 		} else {
 			d = maybeDomain.Domain
 		}
@@ -67,41 +66,49 @@ func (e *DomainAdminEndpoint) makeSetDomainHandler() http.HandlerFunc {
 		}
 		err = e.domainRepo.Set(r.Context(), d)
 		if err != nil {
-			return SetDomainResponse{}, err
+			return DomainResponse{}, err
 		}
-		return SetDomainResponse{
-			BaseDomainResponse: BaseDomainResponse{
-				Hostname:          d.Hostname,
-				TenantID:          d.TenantID,
-				OwnershipVerified: d.OwnershipVerified,
-			},
-			RequiredDNSRecords: e.DNSRecordManager.GetRequiredDNSRecords(d.Hostname),
-		}, nil
+		return e.buildDomainResponse(d), nil
 	})
 }
 
-type GetDomainResponse = SerializedDomain
-
-func (e *DomainAdminEndpoint) makeGetDomainHandler() http.HandlerFunc {
-	return JSONHandler(http.StatusOK, func(r *http.Request, _ struct{}) (GetDomainResponse, error) {
+func (e *DomainAdminEndpoint) handleGetDomain() http.HandlerFunc {
+	return JSONHandler(http.StatusOK, func(r *http.Request, _ struct{}) (DomainResponse, error) {
 		hostname := chi.URLParam(r, "hostname")
 		sd, err := e.domainRepo.Get(r.Context(), hostname)
 		if err == domain.ErrNotFound {
-			return GetDomainResponse{}, HTTPError{
+			return DomainResponse{}, HTTPError{
 				Status:  http.StatusNotFound,
 				Message: "domain not found",
 			}
 		} else if err != nil {
-			return GetDomainResponse{}, err
+			return DomainResponse{}, err
 		}
-		d := sd.Domain
-		return GetDomainResponse{
-			BaseDomainResponse: BaseDomainResponse{
-				Hostname:          d.Hostname,
-				TenantID:          d.TenantID,
-				OwnershipVerified: d.OwnershipVerified,
-			},
-			RequiredDNSRecords: e.DNSRecordManager.GetRequiredDNSRecords(d.Hostname),
-		}, nil
+		return e.buildDomainResponse(sd.Domain), nil
 	})
+}
+
+func (e *DomainAdminEndpoint) handleDeleteDomain() http.HandlerFunc {
+	return JSONHandler(http.StatusNoContent, func(r *http.Request, _ struct{}) (struct{}, error) {
+		hostname := chi.URLParam(r, "hostname")
+		err := e.domainRepo.Delete(r.Context(), hostname)
+		if err == domain.ErrNotFound {
+			return struct{}{}, HTTPError{
+				Status:  http.StatusNotFound,
+				Message: "domain not found",
+			}
+		}
+		return struct{}{}, err
+	})
+}
+
+func (e *DomainAdminEndpoint) buildDomainResponse(d *domain.Domain) DomainResponse {
+	return DomainResponse{
+		BaseDomainResponse: BaseDomainResponse{
+			Hostname:          d.Hostname,
+			TenantID:          d.TenantID,
+			OwnershipVerified: d.OwnershipVerified,
+		},
+		RequiredDNSRecords: e.DNSRecordManager.GetRequiredDNSRecords(d.Hostname),
+	}
 }
