@@ -3,6 +3,7 @@ package endpoint
 import (
 	"net/http"
 
+	"github.com/ericls/certmatic/internal/certman"
 	"github.com/ericls/certmatic/internal/dns"
 	"github.com/ericls/certmatic/pkg/domain"
 	"github.com/go-chi/chi/v5"
@@ -13,6 +14,7 @@ import (
 func MakeAdminRouter(
 	dbRepo domain.DomainRepo,
 	dnsRecordManager *dns.DNSRecordManager,
+	certMan certman.CertMan,
 	logger *zap.Logger,
 ) chi.Router {
 	r := chi.NewRouter()
@@ -23,6 +25,8 @@ func MakeAdminRouter(
 		w.Write([]byte("OK"))
 	})
 	domainRouter := newDomainAdminEndpoint(dbRepo, dnsRecordManager).BuildDomainAdminRouter()
+	certRouter := newCertAdminEndpoint(certMan).BuildCertAdminRouter()
+	r.Mount("/cert", certRouter)
 	r.Mount("/domain", domainRouter)
 	return r
 }

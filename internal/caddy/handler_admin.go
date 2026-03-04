@@ -7,6 +7,8 @@ import (
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
+	"github.com/caddyserver/caddy/v2/modules/caddytls"
+	"github.com/ericls/certmatic/internal/certman"
 	"github.com/ericls/certmatic/internal/endpoint"
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
@@ -17,6 +19,8 @@ type AdminHandler struct {
 	logger *zap.Logger
 
 	router chi.Router
+	// tlsApp *caddytls.TLS
+	cerMan certman.CertMan
 }
 
 func init() {
@@ -34,6 +38,7 @@ func (AdminHandler) CaddyModule() caddy.ModuleInfo {
 
 // Provision implements caddy.Provisioner.
 func (h *AdminHandler) Provision(ctx caddy.Context) error {
+	// APP
 	app, err := ctx.App("certmatic")
 	if err != nil {
 		return err
@@ -43,8 +48,27 @@ func (h *AdminHandler) Provision(ctx caddy.Context) error {
 		return fmt.Errorf("domainRepo is not initialized in app")
 	}
 	h.logger = h.app.logger.With(zap.String("module", "admin_handler"))
+	// TLS
+	tlsAppInterface, err := ctx.App("tls")
+	if err != nil {
+		return fmt.Errorf("error getting tls app: %w", err)
+	}
+	if tlsAppInterface == nil {
+		return fmt.Errorf("tls app is not initialized")
+	}
+	tlsApp, ok := tlsAppInterface.(*caddytls.TLS)
+	if !ok {
+		return fmt.Errorf("tls app is not of type *caddytls.TLS")
+	}
+	// Storage
+	storage := ctx.Storage()
+	if storage == nil {
+		return fmt.Errorf("no storage found in context")
+	}
+	certMan := certman.NewCaddyCertMan(storage, tlsApp)
+	// HTTP handler
 	h.logger.Info("provisioning admin handler")
-	adminRouter := endpoint.MakeAdminRouter(h.app.domainRepo, h.app.dnsRecordManager, h.logger)
+	adminRouter := endpoint.MakeAdminRouter(h.app.domainRepo, h.app.dnsRecordManager, certMan, h.logger)
 	h.router = chi.NewRouter()
 	h.router.Mount("/", adminRouter)
 	return nil
