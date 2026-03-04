@@ -44,6 +44,11 @@ type DomainResponse struct {
 	RequiredDNSRecords []domain.DNSRecord `json:"required_dns_records,omitempty" yaml:"required_dns_records,omitempty"`
 }
 
+type DeleteDomainResponse struct {
+	OK       bool   `json:"ok" yaml:"ok"`
+	Hostname string `json:"hostname" yaml:"hostname"`
+}
+
 func (e *DomainAdminEndpoint) handleUpsertDomain() http.HandlerFunc {
 	return JSONHandler(http.StatusOK, func(r *http.Request, body UpsertDomainRequest) (DomainResponse, error) {
 		hostname := chi.URLParam(r, "hostname")
@@ -89,16 +94,21 @@ func (e *DomainAdminEndpoint) handleGetDomain() http.HandlerFunc {
 }
 
 func (e *DomainAdminEndpoint) handleDeleteDomain() http.HandlerFunc {
-	return JSONHandler(http.StatusNoContent, func(r *http.Request, _ struct{}) (struct{}, error) {
+	return JSONHandler(http.StatusNoContent, func(r *http.Request, _ struct{}) (DeleteDomainResponse, error) {
 		hostname := chi.URLParam(r, "hostname")
 		err := e.domainRepo.Delete(r.Context(), hostname)
 		if err == domain.ErrNotFound {
-			return struct{}{}, HTTPError{
-				Status:  http.StatusNotFound,
-				Message: "domain not found",
-			}
+			return DeleteDomainResponse{
+					OK: false,
+				}, HTTPError{
+					Status:  http.StatusNotFound,
+					Message: "domain not found",
+				}
 		}
-		return struct{}{}, err
+		return DeleteDomainResponse{
+			OK:       true,
+			Hostname: hostname,
+		}, nil
 	})
 }
 
