@@ -3,35 +3,64 @@ package endpoint
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
+	"strings"
 
 	"github.com/go-playground/validator/v10"
 )
 
 var validate = validator.New()
 
-func decodeJSON(r *http.Request, v any) error {
+type apiResponse struct {
+	Data   any        `json:"data"`
+	Errors []apiError `json:"errors"`
+}
+
+type apiError struct {
+	Message string `json:"message"`
+	Field   string `json:"field,omitempty"`
+}
+
+func decodeRequestBodyJSON(r *http.Request, v any) error {
 	defer r.Body.Close()
-	if err := json.NewDecoder(r.Body).Decode(v); err != nil {
+	bodyStrBuilder := new(strings.Builder)
+	if _, err := io.Copy(bodyStrBuilder, r.Body); err != nil {
+		return err
+	}
+	bodyStr := bodyStrBuilder.String()
+	if bodyStr == "" {
+		bodyStr = "{}"
+	}
+	if err := json.Unmarshal([]byte(bodyStr), v); err != nil {
 		return err
 	}
 	return validate.Struct(v)
 }
 
-func writeJSON(w http.ResponseWriter, status int, v any) error {
+func writeJSON(w http.ResponseWriter, status int, data any) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	return json.NewEncoder(w).Encode(v)
+	return json.NewEncoder(w).Encode(apiResponse{Data: data, Errors: []apiError{}})
 }
 
-func writeError(w http.ResponseWriter, status int, errorCode string) error {
-	return writeJSON(w, status, ErrorResponse{
-		ErrorCode: errorCode,
+func writeError(w http.ResponseWriter, status int, message string) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	return json.NewEncoder(w).Encode(apiResponse{
+		Data:   nil,
+		Errors: []apiError{{Message: message}},
 	})
 }
 
-type ErrorResponse struct {
-	ErrorCode string `json:"error"`
+func writeValidationErrors(w http.ResponseWriter, errs validator.ValidationErrors) error {
+	apiErrors := make([]apiError, 0, len(errs))
+	for _, e := range errs {
+		apiErrors = append(apiErrors, apiError{Field: e.Field(), Message: e.Tag()})
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusUnprocessableEntity)
+	return json.NewEncoder(w).Encode(apiResponse{Data: nil, Errors: apiErrors})
 }
 
 type JSONHandlerFunc[TReq any, TRes any] func(r *http.Request, body TReq) (TRes, error)
@@ -39,18 +68,6 @@ type JSONHandlerFunc[TReq any, TRes any] func(r *http.Request, body TReq) (TRes,
 type HTTPError struct {
 	Status  int
 	Message string
-}
-
-type ValidationErrorResponse struct {
-	Errors map[string]string `json:"errors"`
-}
-
-func formatValidationErrors(errs validator.ValidationErrors) map[string]string {
-	result := make(map[string]string, len(errs))
-	for _, e := range errs {
-		result[e.Field()] = e.Tag() // e.g. {"Name": "required"}
-	}
-	return result
 }
 
 func (e HTTPError) Error() string { return e.Message }
@@ -61,12 +78,11 @@ func JSONHandler[TReq any, TRes any](statusOnOK int, handler JSONHandlerFunc[TRe
 		shouldRequestHaveBody := method == http.MethodPost || method == http.MethodPut || method == http.MethodPatch
 		var body TReq
 		if shouldRequestHaveBody {
-			if err := decodeJSON(r, &body); err != nil {
+			r.Body = http.MaxBytesReader(w, r.Body, 1<<19) // 512KB
+			if err := decodeRequestBodyJSON(r, &body); err != nil {
 				var validationErrs validator.ValidationErrors
 				if errors.As(err, &validationErrs) {
-					writeJSON(w, http.StatusUnprocessableEntity, ValidationErrorResponse{
-						Errors: formatValidationErrors(validationErrs),
-					})
+					writeValidationErrors(w, validationErrs)
 					return
 				}
 				writeError(w, http.StatusBadRequest, "invalid request body")

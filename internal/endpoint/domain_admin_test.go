@@ -50,10 +50,7 @@ func TestGetDomain_Found(t *testing.T) {
 		t.Errorf("expected status %d, got %d", http.StatusOK, rec.Code)
 	}
 
-	var resp DomainResponse
-	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
-		t.Fatalf("failed to decode response: %v", err)
-	}
+	resp := decodeData[DomainResponse](t, rec)
 
 	if resp.Hostname != "example.com" {
 		t.Errorf("expected hostname %q, got %q", "example.com", resp.Hostname)
@@ -85,10 +82,7 @@ func TestUpsertDomain_Create(t *testing.T) {
 		t.Errorf("expected status %d, got %d", http.StatusOK, rec.Code)
 	}
 
-	var resp DomainResponse
-	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
-		t.Fatalf("failed to decode response: %v", err)
-	}
+	resp := decodeData[DomainResponse](t, rec)
 
 	if resp.Hostname != "example.com" {
 		t.Errorf("expected hostname %q, got %q", "example.com", resp.Hostname)
@@ -130,10 +124,7 @@ func TestUpsertDomain_Update(t *testing.T) {
 		t.Errorf("expected status %d, got %d", http.StatusOK, rec.Code)
 	}
 
-	var resp DomainResponse
-	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
-		t.Fatalf("failed to decode response: %v", err)
-	}
+	resp := decodeData[DomainResponse](t, rec)
 
 	if resp.TenantID != "tenant-2" {
 		t.Errorf("expected tenant_id %q, got %q", "tenant-2", resp.TenantID)
@@ -167,10 +158,7 @@ func TestUpsertDomain_PartialUpdate(t *testing.T) {
 		t.Errorf("expected status %d, got %d", http.StatusOK, rec.Code)
 	}
 
-	var resp DomainResponse
-	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
-		t.Fatalf("failed to decode response: %v", err)
-	}
+	resp := decodeData[DomainResponse](t, rec)
 
 	// tenant_id should remain unchanged
 	if resp.TenantID != "tenant-1" {
@@ -217,4 +205,15 @@ func TestDeleteDomain_Success(t *testing.T) {
 
 func ptr[T any](v T) *T {
 	return &v
+}
+
+func decodeData[T any](t *testing.T, rec *httptest.ResponseRecorder) T {
+	t.Helper()
+	var wrapper struct {
+		Data T `json:"data"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&wrapper); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	return wrapper.Data
 }
