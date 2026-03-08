@@ -10,11 +10,17 @@ import (
 )
 
 type CertAdminEndpoint struct {
-	certMan certman.CertMan
+	certMan      certman.CertMan
+	waitTimeout  time.Duration
+	pollInterval time.Duration
 }
 
 func newCertAdminEndpoint(certMan certman.CertMan) *CertAdminEndpoint {
-	return &CertAdminEndpoint{certMan: certMan}
+	return &CertAdminEndpoint{
+		certMan:      certMan,
+		waitTimeout:  1 * time.Minute,
+		pollInterval: 2 * time.Second,
+	}
 }
 
 type CertResponse struct {
@@ -33,6 +39,7 @@ func (e *CertAdminEndpoint) BuildCertAdminRouter() chi.Router {
 	r.Head("/{hostname}", e.handleCertExists())
 	r.Get("/{hostname}", e.handleCertGet())
 	r.Post("/{hostname}/poke", e.handlePokeCert())
+	r.Post("/{hostname}/ensure", e.handlePokeAndWaitCert())
 	return r
 }
 
@@ -87,5 +94,52 @@ func (e *CertAdminEndpoint) handlePokeCert() http.HandlerFunc {
 				HTTPError{Status: http.StatusInternalServerError, Message: fmt.Sprintf("error poking certificate: %v", err)}
 		}
 		return PokeCertResponse{Hostname: hostname}, nil
+	})
+}
+
+func (e *CertAdminEndpoint) handlePokeAndWaitCert() http.HandlerFunc {
+	return JSONHandler(http.StatusOK, func(r *http.Request, _ struct{}) (CertResponse, error) {
+		hostname := chi.URLParam(r, "hostname")
+		err := e.certMan.PokeCert(r.Context(), hostname)
+		if err != nil {
+			return CertResponse{},
+				HTTPError{Status: http.StatusInternalServerError, Message: fmt.Sprintf("error poking certificate: %v", err)}
+		}
+		var certInfo *certman.CertInfo
+		timeout := time.After(e.waitTimeout)
+		// Wait for the certificate to be issued.
+		// TODO: investigate ways to utilize the event system to avoid polling.
+		waitDuration := e.pollInterval
+		for {
+			certInfo, err := e.certMan.GetCertInfo(r.Context(), hostname)
+			if err != nil {
+				return CertResponse{},
+					HTTPError{Status: http.StatusInternalServerError, Message: fmt.Sprintf("error getting certificate info: %v", err)}
+			}
+			if certInfo != nil && certInfo.NotAfter.After(time.Now()) && certInfo.NotBefore.Before(time.Now()) {
+				break
+			}
+			select {
+			case <-timeout:
+				return CertResponse{},
+					HTTPError{Status: http.StatusGatewayTimeout, Message: fmt.Sprintf("timeout waiting for certificate: %s", hostname)}
+			default:
+				time.Sleep(waitDuration)
+				if waitDuration < 10*time.Second {
+					waitDuration += e.pollInterval
+				}
+			}
+		}
+		certInfo, err = e.certMan.GetCertInfo(r.Context(), hostname)
+		if err != nil {
+			return CertResponse{},
+				HTTPError{Status: http.StatusInternalServerError, Message: fmt.Sprintf("error getting certificate info: %v", err)}
+		}
+		return CertResponse{
+			Hostname:  certInfo.Hostname,
+			NotBefore: certInfo.NotBefore,
+			NotAfter:  certInfo.NotAfter,
+			Issuer:    certInfo.Issuer,
+		}, nil
 	})
 }
