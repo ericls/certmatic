@@ -2,6 +2,7 @@ package endpoint
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/ericls/certmatic/internal/certman"
 	"github.com/ericls/certmatic/internal/dns"
@@ -25,7 +26,7 @@ func MakeAdminRouter(
 		w.Write([]byte("OK"))
 	})
 	domainRouter := newDomainAdminEndpoint(dbRepo, dnsRecordManager).BuildDomainAdminRouter()
-	certRouter := newCertAdminEndpoint(certMan).BuildCertAdminRouter()
+	certRouter := newCertAdminEndpoint(certMan, 1*time.Minute, 2*time.Second).BuildCertAdminRouter()
 	r.Mount("/cert", certRouter)
 	r.Mount("/domain", domainRouter)
 	return r

@@ -10,16 +10,16 @@ import (
 )
 
 type CertAdminEndpoint struct {
-	certMan      certman.CertMan
-	waitTimeout  time.Duration
-	pollInterval time.Duration
+	certMan          certman.CertMan
+	certWaitTimeout  time.Duration
+	certPollInterval time.Duration
 }
 
-func newCertAdminEndpoint(certMan certman.CertMan) *CertAdminEndpoint {
+func newCertAdminEndpoint(certMan certman.CertMan, certWaitTimeout, certPollInterval time.Duration) *CertAdminEndpoint {
 	return &CertAdminEndpoint{
-		certMan:      certMan,
-		waitTimeout:  1 * time.Minute,
-		pollInterval: 2 * time.Second,
+		certMan:          certMan,
+		certWaitTimeout:  certWaitTimeout,
+		certPollInterval: certPollInterval,
 	}
 }
 
@@ -106,10 +106,10 @@ func (e *CertAdminEndpoint) handlePokeAndWaitCert() http.HandlerFunc {
 				HTTPError{Status: http.StatusInternalServerError, Message: fmt.Sprintf("error poking certificate: %v", err)}
 		}
 		var certInfo *certman.CertInfo
-		timeout := time.After(e.waitTimeout)
+		timeout := time.After(e.certWaitTimeout)
 		// Wait for the certificate to be issued.
 		// TODO: investigate ways to utilize the event system to avoid polling.
-		waitDuration := e.pollInterval
+		waitDuration := e.certPollInterval
 		for {
 			certInfo, err := e.certMan.GetCertInfo(r.Context(), hostname)
 			if err != nil {
@@ -126,7 +126,7 @@ func (e *CertAdminEndpoint) handlePokeAndWaitCert() http.HandlerFunc {
 			default:
 				time.Sleep(waitDuration)
 				if waitDuration < 10*time.Second {
-					waitDuration += e.pollInterval
+					waitDuration += e.certPollInterval
 				}
 			}
 		}

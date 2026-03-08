@@ -40,7 +40,7 @@ func validCert(hostname string) *certman.CertInfo {
 }
 
 func setupCertAdminRouter(cm certman.CertMan) http.Handler {
-	e := newCertAdminEndpoint(cm)
+	e := newCertAdminEndpoint(cm, 1*time.Minute, 2*time.Second)
 	return e.BuildCertAdminRouter()
 }
 
@@ -237,10 +237,13 @@ func TestPokeAndWaitCert_Success(t *testing.T) {
 		pokeCertFn: func(_ context.Context, _ string) error { return nil },
 		// Return valid cert immediately so the loop breaks on first iteration.
 		getCertInfoFn: func(_ context.Context, _ string) (*certman.CertInfo, error) { return cert, nil },
+		hasCertFn: func(ctx context.Context, hostname string) (bool, error) {
+			return true, nil
+		},
 	}
 	router := setupCertAdminRouter(cm)
 
-	req := httptest.NewRequest(http.MethodPost, "/example.com/poke_and_wait", nil)
+	req := httptest.NewRequest(http.MethodPost, "/example.com/ensure", nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -260,7 +263,7 @@ func TestPokeAndWaitCert_PokeError(t *testing.T) {
 	}
 	router := setupCertAdminRouter(cm)
 
-	req := httptest.NewRequest(http.MethodPost, "/example.com/poke_and_wait", nil)
+	req := httptest.NewRequest(http.MethodPost, "/example.com/ensure", nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -278,7 +281,7 @@ func TestPokeAndWaitCert_GetCertInfoError(t *testing.T) {
 	}
 	router := setupCertAdminRouter(cm)
 
-	req := httptest.NewRequest(http.MethodPost, "/example.com/poke_and_wait", nil)
+	req := httptest.NewRequest(http.MethodPost, "/example.com/ensure", nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -293,12 +296,10 @@ func TestPokeAndWaitCert_Timeout(t *testing.T) {
 		// Never return a valid cert.
 		getCertInfoFn: func(_ context.Context, _ string) (*certman.CertInfo, error) { return nil, nil },
 	}
-	e := newCertAdminEndpoint(cm)
-	e.waitTimeout = 10 * time.Millisecond
-	e.pollInterval = 0
+	e := newCertAdminEndpoint(cm, 10*time.Millisecond, 0)
 	router := e.BuildCertAdminRouter()
 
-	req := httptest.NewRequest(http.MethodPost, "/example.com/poke_and_wait", nil)
+	req := httptest.NewRequest(http.MethodPost, "/example.com/ensure", nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
