@@ -72,7 +72,7 @@ type HTTPError struct {
 
 func (e HTTPError) Error() string { return e.Message }
 
-func JSONHandler[TReq any, TRes any](statusOnOK int, handler JSONHandlerFunc[TReq, TRes]) http.HandlerFunc {
+func JSONHandler[TReq, TRes any](statusOnOK int, handler JSONHandlerFunc[TReq, TRes]) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		method := r.Method
 		shouldRequestHaveBody := method == http.MethodPost || method == http.MethodPut || method == http.MethodPatch

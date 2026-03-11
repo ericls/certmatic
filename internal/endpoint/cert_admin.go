@@ -65,11 +65,17 @@ func (e *CertAdminEndpoint) handleCertGet() http.HandlerFunc {
 		certInfo, err := e.certMan.GetCertInfo(r.Context(), hostname)
 		if err != nil {
 			return CertResponse{},
-				HTTPError{Status: http.StatusInternalServerError, Message: "error getting certificate info"}
+				HTTPError{
+					Status:  http.StatusInternalServerError,
+					Message: "error getting certificate info",
+				}
 		}
 		if certInfo == nil {
 			return CertResponse{},
-				HTTPError{Status: http.StatusNotFound, Message: fmt.Sprintf("certificate not found for hostname: %s", hostname)}
+				HTTPError{
+					Status:  http.StatusNotFound,
+					Message: fmt.Sprintf("certificate not found for hostname: %s", hostname),
+				}
 		}
 		return CertResponse{
 			Hostname:  certInfo.Hostname,
@@ -86,12 +92,18 @@ func (e *CertAdminEndpoint) handlePokeCert() http.HandlerFunc {
 		cert, _ := e.certMan.GetCertInfo(r.Context(), hostname)
 		if cert != nil && cert.NotAfter.After(time.Now()) && cert.NotBefore.Before(time.Now()) {
 			return PokeCertResponse{},
-				HTTPError{Status: http.StatusBadRequest, Message: fmt.Sprintf("certificate already exists and is valid for hostname: %s", hostname)}
+				HTTPError{
+					Status:  http.StatusBadRequest,
+					Message: fmt.Sprintf("certificate already exists and is valid for hostname: %s", hostname),
+				}
 		}
 		err := e.certMan.PokeCert(r.Context(), hostname)
 		if err != nil {
 			return PokeCertResponse{},
-				HTTPError{Status: http.StatusInternalServerError, Message: fmt.Sprintf("error poking certificate: %v", err)}
+				HTTPError{
+					Status:  http.StatusInternalServerError,
+					Message: fmt.Sprintf("error poking certificate: %v", err),
+				}
 		}
 		return PokeCertResponse{Hostname: hostname}, nil
 	})
@@ -103,7 +115,10 @@ func (e *CertAdminEndpoint) handlePokeAndWaitCert() http.HandlerFunc {
 		err := e.certMan.PokeCert(r.Context(), hostname)
 		if err != nil {
 			return CertResponse{},
-				HTTPError{Status: http.StatusInternalServerError, Message: fmt.Sprintf("error poking certificate: %v", err)}
+				HTTPError{
+					Status:  http.StatusInternalServerError,
+					Message: fmt.Sprintf("error poking certificate: %v", err),
+				}
 		}
 		var certInfo *certman.CertInfo
 		timeout := time.After(e.certWaitTimeout)
@@ -114,7 +129,10 @@ func (e *CertAdminEndpoint) handlePokeAndWaitCert() http.HandlerFunc {
 			certInfo, err := e.certMan.GetCertInfo(r.Context(), hostname)
 			if err != nil {
 				return CertResponse{},
-					HTTPError{Status: http.StatusInternalServerError, Message: fmt.Sprintf("error getting certificate info: %v", err)}
+					HTTPError{
+						Status:  http.StatusInternalServerError,
+						Message: fmt.Sprintf("error getting certificate info: %v", err),
+					}
 			}
 			if certInfo != nil && certInfo.NotAfter.After(time.Now()) && certInfo.NotBefore.Before(time.Now()) {
 				break
@@ -122,7 +140,10 @@ func (e *CertAdminEndpoint) handlePokeAndWaitCert() http.HandlerFunc {
 			select {
 			case <-timeout:
 				return CertResponse{},
-					HTTPError{Status: http.StatusGatewayTimeout, Message: fmt.Sprintf("timeout waiting for certificate: %s", hostname)}
+					HTTPError{
+						Status:  http.StatusGatewayTimeout,
+						Message: fmt.Sprintf("timeout waiting for certificate: %s", hostname),
+					}
 			default:
 				time.Sleep(waitDuration)
 				if waitDuration < 10*time.Second {
@@ -133,7 +154,10 @@ func (e *CertAdminEndpoint) handlePokeAndWaitCert() http.HandlerFunc {
 		certInfo, err = e.certMan.GetCertInfo(r.Context(), hostname)
 		if err != nil {
 			return CertResponse{},
-				HTTPError{Status: http.StatusInternalServerError, Message: fmt.Sprintf("error getting certificate info: %v", err)}
+				HTTPError{
+					Status:  http.StatusInternalServerError,
+					Message: fmt.Sprintf("error getting certificate info: %v", err),
+				}
 		}
 		return CertResponse{
 			Hostname:  certInfo.Hostname,

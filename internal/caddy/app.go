@@ -125,7 +125,8 @@ func (a *App) Provision(ctx caddy.Context) error {
 }
 
 func (a *App) Handle(ctx context.Context, event caddy.Event) error {
-	a.logger.Info("received event", zap.String("event", event.Name()), zap.String("origin", string(event.Origin().CaddyModule().ID)))
+	a.logger.Info("received event", zap.String("event", event.Name()),
+		zap.String("origin", string(event.Origin().CaddyModule().ID)))
 	return nil
 }
 

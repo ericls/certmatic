@@ -4,9 +4,11 @@ import "encoding/json"
 
 type StorageType string
 
-const StorageTypeMemory StorageType = "memory"
-const StorageTypePostgres StorageType = "postgres"
-const StorageTypeSqlite StorageType = "sqlite"
+const (
+	StorageTypeMemory   StorageType = "memory"
+	StorageTypePostgres StorageType = "postgres"
+	StorageTypeSqlite   StorageType = "sqlite"
+)
 
 type Store struct {
 	Type   string                 `json:"type,omitempty"`
