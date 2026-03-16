@@ -67,6 +67,18 @@ func (a *App) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 					return d.Errf("cname_target cannot be empty")
 				}
 				a.CNameTarget = val
+			case "portal_signing_key":
+				if !d.NextArg() {
+					return d.ArgErr()
+				}
+				a.PortalSigningKey = d.Val()
+			case "portal_base_url":
+				if !d.NextArg() {
+					return d.ArgErr()
+				}
+				a.PortalBaseURL = d.Val()
+			case "portal_dev_mode":
+				a.PortalDevMode = true
 			default:
 				return d.Errf("unrecognized certmatic option: %s", d.Val())
 			}
