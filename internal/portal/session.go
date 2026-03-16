@@ -4,7 +4,6 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -47,57 +46,55 @@ type Session struct {
 
 // SessionStore manages portal sessions.
 type SessionStore interface {
-	// RedeemToken validates an HMAC-signed token (one-time use) and stores the resulting session.
+	// StoreSession persists a newly created session.
+	StoreSession(session *Session) error
+	// RedeemToken validates an HMAC-signed token (one-time use) and returns the stored session.
 	RedeemToken(signingKey []byte, token string) (*Session, error)
 	// GetSession looks up an active session by session ID.
 	GetSession(sessionID string) (*Session, error)
+	// ClearExpired removes all sessions that have passed their expiry time.
+	ClearExpired() error
 }
 
-type tokenPayload struct {
-	Hostname                  string                    `json:"hostname"`
-	SessionID                 string                    `json:"session_id"`
-	ExpiresAt                 time.Time                 `json:"expires_at"`
-	BackURL                   string                    `json:"back_url,omitempty"`
-	BackText                  string                    `json:"back_text,omitempty"`
-	OwnershipVerificationMode OwnershipVerificationMode `json:"ownership_verification_mode,omitempty"`
-	VerifyOwnershipURL        string                    `json:"verify_ownership_url,omitempty"`
-	VerifyOwnershipText       string                    `json:"verify_ownership_text,omitempty"`
-}
-
-// CreateToken generates a new HMAC-signed portal token for the given hostname.
-// Returns the token string and its expiry time.
-func CreateToken(signingKey []byte, hostname string, ttl time.Duration, backURL, backText string, ownershipMode OwnershipVerificationMode, verifyOwnershipURL, verifyOwnershipText string) (string, time.Time, error) {
+// CreateToken stores a new session and returns an HMAC-signed token containing only the session ID.
+func CreateToken(store SessionStore, signingKey []byte, hostname string, ttl time.Duration, backURL, backText string, ownershipMode OwnershipVerificationMode, verifyOwnershipURL, verifyOwnershipText string) (string, time.Time, error) {
 	sessionID, err := uuid.NewRandom()
 	if err != nil {
 		return "", time.Time{}, fmt.Errorf("generate session id: %w", err)
 	}
-	payload := tokenPayload{
-		Hostname:                  hostname,
+	expiresAt := time.Now().UTC().Add(ttl)
+	session := &Session{
 		SessionID:                 sessionID.String(),
-		ExpiresAt:                 time.Now().UTC().Add(ttl),
+		Hostname:                  hostname,
+		ExpiresAt:                 expiresAt,
 		BackURL:                   backURL,
 		BackText:                  backText,
 		OwnershipVerificationMode: ownershipMode,
 		VerifyOwnershipURL:        verifyOwnershipURL,
 		VerifyOwnershipText:       verifyOwnershipText,
 	}
-	payloadJSON, err := json.Marshal(payload)
-	if err != nil {
-		return "", time.Time{}, fmt.Errorf("marshal payload: %w", err)
+	if err := store.StoreSession(session); err != nil {
+		return "", time.Time{}, fmt.Errorf("store session: %w", err)
 	}
-	payloadB64 := base64.RawURLEncoding.EncodeToString(payloadJSON)
-
-	mac := hmac.New(sha256.New, signingKey)
-	mac.Write([]byte(payloadB64))
-	sig := mac.Sum(nil)
-	sigB64 := base64.RawURLEncoding.EncodeToString(sig)
-
-	token := payloadB64 + "." + sigB64
-	return token, payload.ExpiresAt, nil
+	token, err := signSessionID(signingKey, sessionID.String())
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	return token, expiresAt, nil
 }
 
-func verifyToken(signingKey []byte, token string) (*tokenPayload, error) {
-	// Find the last dot separating payload from signature.
+// signSessionID produces base64url(sessionID) + "." + base64url(HMAC-SHA256(key, base64url(sessionID))).
+func signSessionID(signingKey []byte, sessionID string) (string, error) {
+	idB64 := base64.RawURLEncoding.EncodeToString([]byte(sessionID))
+	mac := hmac.New(sha256.New, signingKey)
+	mac.Write([]byte(idB64))
+	sig := mac.Sum(nil)
+	sigB64 := base64.RawURLEncoding.EncodeToString(sig)
+	return idB64 + "." + sigB64, nil
+}
+
+// verifyTokenGetSessionID verifies the HMAC signature and returns the session ID.
+func verifyTokenGetSessionID(signingKey []byte, token string) (string, error) {
 	dotIdx := -1
 	for i := len(token) - 1; i >= 0; i-- {
 		if token[i] == '.' {
@@ -106,35 +103,26 @@ func verifyToken(signingKey []byte, token string) (*tokenPayload, error) {
 		}
 	}
 	if dotIdx < 0 {
-		return nil, ErrInvalidToken
+		return "", ErrInvalidToken
 	}
-	payloadB64 := token[:dotIdx]
+	idB64 := token[:dotIdx]
 	sigB64 := token[dotIdx+1:]
 
 	mac := hmac.New(sha256.New, signingKey)
-	mac.Write([]byte(payloadB64))
+	mac.Write([]byte(idB64))
 	expectedSig := mac.Sum(nil)
 
 	actualSig, err := base64.RawURLEncoding.DecodeString(sigB64)
 	if err != nil {
-		return nil, ErrInvalidToken
+		return "", ErrInvalidToken
 	}
 	if !hmac.Equal(expectedSig, actualSig) {
-		return nil, ErrInvalidToken
+		return "", ErrInvalidToken
 	}
 
-	payloadJSON, err := base64.RawURLEncoding.DecodeString(payloadB64)
+	idBytes, err := base64.RawURLEncoding.DecodeString(idB64)
 	if err != nil {
-		return nil, ErrInvalidToken
+		return "", ErrInvalidToken
 	}
-	var payload tokenPayload
-	if err := json.Unmarshal(payloadJSON, &payload); err != nil {
-		return nil, ErrInvalidToken
-	}
-
-	if time.Now().After(payload.ExpiresAt) {
-		return nil, ErrExpiredToken
-	}
-
-	return &payload, nil
+	return string(idBytes), nil
 }
