@@ -23,10 +23,12 @@ type certStatusResponse struct {
 }
 
 type portalDomainResponse struct {
-	Hostname          string             `json:"hostname"`
-	OwnershipVerified bool               `json:"ownership_verified"`
+	Hostname           string             `json:"hostname"`
+	OwnershipVerified  bool               `json:"ownership_verified"`
 	RequiredDNSRecords []domain.DNSRecord `json:"required_dns_records"`
-	CertStatus        certStatusResponse `json:"cert_status"`
+	CertStatus         certStatusResponse `json:"cert_status"`
+	BackURL            string             `json:"back_url,omitempty"`
+	BackText           string             `json:"back_text,omitempty"`
 }
 
 func (e *portalDomainEndpoint) handleGetDomain() http.HandlerFunc {
@@ -50,10 +52,12 @@ func (e *portalDomainEndpoint) handleGetDomain() http.HandlerFunc {
 		}
 
 		return portalDomainResponse{
-			Hostname:          sd.Domain.Hostname,
-			OwnershipVerified: sd.Domain.OwnershipVerified,
+			Hostname:           sd.Domain.Hostname,
+			OwnershipVerified:  sd.Domain.OwnershipVerified,
 			RequiredDNSRecords: e.dnsRecordManager.GetRequiredDNSRecords(session.Hostname),
-			CertStatus: certStatusResponse{HasCert: hasCert},
+			CertStatus:         certStatusResponse{HasCert: hasCert},
+			BackURL:            session.BackURL,
+			BackText:           session.BackText,
 		}, nil
 	})
 }

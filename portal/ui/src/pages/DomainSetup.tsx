@@ -6,7 +6,11 @@ import { CertStatusCard } from "../components/CertStatusCard";
 import { DoctorReport } from "../components/DoctorReport";
 import { StatusBadge } from "../components/StatusBadge";
 
-export function DomainSetup() {
+interface Props {
+  onBackButton: (back: { url: string; text: string } | null) => void;
+}
+
+export function DomainSetup({ onBackButton }: Props) {
   const [domain, setDomain] = useState<DomainInfo | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [checkReport, setCheckReport] = useState<DomainCheckReport | null>(null);
@@ -15,9 +19,12 @@ export function DomainSetup() {
 
   useEffect(() => {
     getDomainInfo()
-      .then(setDomain)
+      .then((d) => {
+        setDomain(d);
+        onBackButton(d.back_url ? { url: d.back_url, text: d.back_text || "Back" } : null);
+      })
       .catch((e: Error) => setLoadError(e.message));
-  }, []);
+  }, [onBackButton]);
 
   const handleRunCheck = async () => {
     setChecking(true);
