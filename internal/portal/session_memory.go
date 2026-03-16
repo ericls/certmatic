@@ -32,6 +32,8 @@ func (s *MemorySessionStore) RedeemToken(signingKey []byte, token string) (*Sess
 		SessionID: payload.SessionID,
 		Hostname:  payload.Hostname,
 		ExpiresAt: payload.ExpiresAt,
+		BackURL:   payload.BackURL,
+		BackText:  payload.BackText,
 	}
 
 	// LoadOrStore ensures one-time use: if session_id was already redeemed, reject.

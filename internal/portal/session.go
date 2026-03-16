@@ -23,6 +23,8 @@ type Session struct {
 	SessionID string
 	Hostname  string
 	ExpiresAt time.Time
+	BackURL   string
+	BackText  string
 }
 
 // SessionStore manages portal sessions.
@@ -37,11 +39,13 @@ type tokenPayload struct {
 	Hostname  string    `json:"hostname"`
 	SessionID string    `json:"session_id"`
 	ExpiresAt time.Time `json:"expires_at"`
+	BackURL   string    `json:"back_url,omitempty"`
+	BackText  string    `json:"back_text,omitempty"`
 }
 
 // CreateToken generates a new HMAC-signed portal token for the given hostname.
 // Returns the token string and its expiry time.
-func CreateToken(signingKey []byte, hostname string, ttl time.Duration) (string, time.Time, error) {
+func CreateToken(signingKey []byte, hostname string, ttl time.Duration, backURL, backText string) (string, time.Time, error) {
 	sessionID, err := uuid.NewRandom()
 	if err != nil {
 		return "", time.Time{}, fmt.Errorf("generate session id: %w", err)
@@ -50,6 +54,8 @@ func CreateToken(signingKey []byte, hostname string, ttl time.Duration) (string,
 		Hostname:  hostname,
 		SessionID: sessionID.String(),
 		ExpiresAt: time.Now().UTC().Add(ttl),
+		BackURL:   backURL,
+		BackText:  backText,
 	}
 	payloadJSON, err := json.Marshal(payload)
 	if err != nil {

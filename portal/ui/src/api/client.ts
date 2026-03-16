@@ -13,6 +13,8 @@ export interface DomainInfo {
   ownership_verified: boolean;
   required_dns_records: DNSRecord[];
   cert_status: CertStatus;
+  back_url?: string;
+  back_text?: string;
 }
 
 export type CheckStatus = "ok" | "fail" | "pending";

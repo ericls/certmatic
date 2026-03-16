@@ -31,6 +31,8 @@ func newPortalSessionAdminEndpoint(
 
 type createPortalSessionRequest struct {
 	Hostname string `json:"hostname" validate:"required"`
+	BackURL  string `json:"back_url"`
+	BackText string `json:"back_text"`
 }
 
 type createPortalSessionResponse struct {
@@ -51,7 +53,7 @@ func (e *portalSessionAdminEndpoint) handleCreateSession() http.HandlerFunc {
 			return createPortalSessionResponse{}, err
 		}
 
-		token, expiresAt, err := portal.CreateToken(e.signingKey, body.Hostname, 60*time.Minute)
+		token, expiresAt, err := portal.CreateToken(e.signingKey, body.Hostname, 60*time.Minute, body.BackURL, body.BackText)
 		if err != nil {
 			return createPortalSessionResponse{}, err
 		}
