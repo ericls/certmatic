@@ -66,6 +66,18 @@ export function DomainSetup({ onBackButton }: Props) {
         <div className="mt-1 flex items-center gap-2">
           <span className="text-sm text-gray-500 dark:text-gray-400">Ownership:</span>
           <StatusBadge status={domain.ownership_verified ? "ok" : "pending"} />
+          {!domain.ownership_verified &&
+            domain.ownership_verification_mode === "provider_managed" &&
+            domain.verify_ownership_url && (
+              <a
+                href={domain.verify_ownership_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-1 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                {domain.verify_ownership_text ?? "Verify Ownership"}
+              </a>
+            )}
         </div>
       </div>
 
@@ -79,6 +91,19 @@ export function DomainSetup({ onBackButton }: Props) {
         </p>
         <RequiredRecords records={domain.required_dns_records} />
       </section>
+
+      {/* Ownership Verification Record (DNS challenge mode) */}
+      {domain.ownership_txt_record && (
+        <section>
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3">
+            Ownership Verification Record
+          </h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            Add this TXT record to prove ownership.
+          </p>
+          <RequiredRecords records={[domain.ownership_txt_record]} />
+        </section>
+      )}
 
       {/* Certificate Status */}
       <section>

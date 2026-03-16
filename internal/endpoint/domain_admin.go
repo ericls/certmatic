@@ -1,11 +1,13 @@
 package endpoint
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/ericls/certmatic/internal/dns"
 	"github.com/ericls/certmatic/pkg/domain"
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 )
 
 type DomainAdminEndpoint struct {
@@ -32,6 +34,7 @@ type BaseDomainResponse struct {
 	Hostname          string `json:"hostname" yaml:"hostname"`
 	TenantID          string `json:"tenant_id,omitempty" yaml:"tenant_id,omitempty"`
 	OwnershipVerified bool   `json:"ownership_verified" yaml:"ownership_verified"`
+	VerificationToken string `json:"verification_token,omitempty" yaml:"verification_token,omitempty"`
 }
 
 type UpsertDomainRequest struct {
@@ -68,6 +71,13 @@ func (e *DomainAdminEndpoint) handleUpsertDomain() http.HandlerFunc {
 		}
 		if body.OwnershipVerified != nil {
 			d.OwnershipVerified = *body.OwnershipVerified
+		}
+		if d.VerificationToken == "" {
+			tok, err := uuid.NewRandom()
+			if err != nil {
+				return DomainResponse{}, fmt.Errorf("generate verification token: %w", err)
+			}
+			d.VerificationToken = tok.String()
 		}
 		err = e.domainRepo.Set(r.Context(), d)
 		if err != nil {
@@ -118,6 +128,7 @@ func (e *DomainAdminEndpoint) buildDomainResponse(d *domain.Domain) DomainRespon
 			Hostname:          d.Hostname,
 			TenantID:          d.TenantID,
 			OwnershipVerified: d.OwnershipVerified,
+			VerificationToken: d.VerificationToken,
 		},
 		RequiredDNSRecords: e.DNSRecordManager.GetRequiredDNSRecords(d.Hostname),
 	}

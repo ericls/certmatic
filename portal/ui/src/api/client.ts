@@ -15,6 +15,10 @@ export interface DomainInfo {
   cert_status: CertStatus;
   back_url?: string;
   back_text?: string;
+  ownership_verification_mode?: "dns_challenge" | "provider_managed" | "";
+  ownership_txt_record?: DNSRecord;
+  verify_ownership_url?: string;
+  verify_ownership_text?: string;
 }
 
 export type CheckStatus = "ok" | "fail" | "pending";

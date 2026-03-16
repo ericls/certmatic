@@ -5,6 +5,7 @@ const checkDisplayNames: Record<string, string> = {
   cname_record: "CNAME Record",
   a_record: "A Record",
   txt_record: "TXT Record",
+  ownership_txt_record: "Ownership TXT Record",
   ownership_verified: "Ownership Verified",
   certificate: "Certificate",
 };
