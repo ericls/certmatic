@@ -30,9 +30,12 @@ func newPortalSessionAdminEndpoint(
 }
 
 type createPortalSessionRequest struct {
-	Hostname string `json:"hostname" validate:"required"`
-	BackURL  string `json:"back_url"`
-	BackText string `json:"back_text"`
+	Hostname                  string                           `json:"hostname" validate:"required"`
+	BackURL                   string                           `json:"back_url"`
+	BackText                  string                           `json:"back_text"`
+	OwnershipVerificationMode portal.OwnershipVerificationMode `json:"ownership_verification_mode"`
+	VerifyOwnershipURL        string                           `json:"verify_ownership_url"`
+	VerifyOwnershipText       string                           `json:"verify_ownership_text"`
 }
 
 type createPortalSessionResponse struct {
@@ -53,7 +56,7 @@ func (e *portalSessionAdminEndpoint) handleCreateSession() http.HandlerFunc {
 			return createPortalSessionResponse{}, err
 		}
 
-		token, expiresAt, err := portal.CreateToken(e.signingKey, body.Hostname, 60*time.Minute, body.BackURL, body.BackText)
+		token, expiresAt, err := portal.CreateToken(e.signingKey, body.Hostname, 60*time.Minute, body.BackURL, body.BackText, body.OwnershipVerificationMode, body.VerifyOwnershipURL, body.VerifyOwnershipText)
 		if err != nil {
 			return createPortalSessionResponse{}, err
 		}

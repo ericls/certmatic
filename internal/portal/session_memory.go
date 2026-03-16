@@ -29,11 +29,14 @@ func (s *MemorySessionStore) RedeemToken(signingKey []byte, token string) (*Sess
 	}
 
 	session := &Session{
-		SessionID: payload.SessionID,
-		Hostname:  payload.Hostname,
-		ExpiresAt: payload.ExpiresAt,
-		BackURL:   payload.BackURL,
-		BackText:  payload.BackText,
+		SessionID:                 payload.SessionID,
+		Hostname:                  payload.Hostname,
+		ExpiresAt:                 payload.ExpiresAt,
+		BackURL:                   payload.BackURL,
+		BackText:                  payload.BackText,
+		OwnershipVerificationMode: payload.OwnershipVerificationMode,
+		VerifyOwnershipURL:        payload.VerifyOwnershipURL,
+		VerifyOwnershipText:       payload.VerifyOwnershipText,
 	}
 
 	// LoadOrStore ensures one-time use: if session_id was already redeemed, reject.

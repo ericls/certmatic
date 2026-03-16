@@ -17,6 +17,10 @@ type Domain struct {
 
 	OwnershipVerified bool `json:"ownership_verified" yaml:"ownership_verified"`
 
+	// VerificationToken is a stable UUID used as the DNS TXT record value for ownership verification.
+	// Generated once on first upsert and never rotated unless explicitly cleared.
+	VerificationToken string `json:"verification_token,omitempty" yaml:"verification_token,omitempty"`
+
 	// Metadata map[string]string `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 }
 

@@ -7,6 +7,7 @@ import (
 
 	"github.com/ericls/certmatic/internal/certman"
 	"github.com/ericls/certmatic/internal/dns"
+	"github.com/ericls/certmatic/internal/portal"
 	"github.com/ericls/certmatic/pkg/domain"
 )
 
@@ -23,12 +24,16 @@ type certStatusResponse struct {
 }
 
 type portalDomainResponse struct {
-	Hostname           string             `json:"hostname"`
-	OwnershipVerified  bool               `json:"ownership_verified"`
-	RequiredDNSRecords []domain.DNSRecord `json:"required_dns_records"`
-	CertStatus         certStatusResponse `json:"cert_status"`
-	BackURL            string             `json:"back_url,omitempty"`
-	BackText           string             `json:"back_text,omitempty"`
+	Hostname                  string                           `json:"hostname"`
+	OwnershipVerified         bool                             `json:"ownership_verified"`
+	RequiredDNSRecords        []domain.DNSRecord               `json:"required_dns_records"`
+	CertStatus                certStatusResponse               `json:"cert_status"`
+	BackURL                   string                           `json:"back_url,omitempty"`
+	BackText                  string                           `json:"back_text,omitempty"`
+	OwnershipVerificationMode portal.OwnershipVerificationMode `json:"ownership_verification_mode,omitempty"`
+	OwnershipTXTRecord        *domain.DNSRecord                `json:"ownership_txt_record,omitempty"`
+	VerifyOwnershipURL        string                           `json:"verify_ownership_url,omitempty"`
+	VerifyOwnershipText       string                           `json:"verify_ownership_text,omitempty"`
 }
 
 func (e *portalDomainEndpoint) handleGetDomain() http.HandlerFunc {
@@ -51,14 +56,30 @@ func (e *portalDomainEndpoint) handleGetDomain() http.HandlerFunc {
 			hasCert, _ = e.certMan.HasCert(r.Context(), session.Hostname)
 		}
 
-		return portalDomainResponse{
-			Hostname:           sd.Domain.Hostname,
-			OwnershipVerified:  sd.Domain.OwnershipVerified,
-			RequiredDNSRecords: e.dnsRecordManager.GetRequiredDNSRecords(session.Hostname),
-			CertStatus:         certStatusResponse{HasCert: hasCert},
-			BackURL:            session.BackURL,
-			BackText:           session.BackText,
-		}, nil
+		resp := portalDomainResponse{
+			Hostname:                  sd.Domain.Hostname,
+			OwnershipVerified:         sd.Domain.OwnershipVerified,
+			RequiredDNSRecords:        e.dnsRecordManager.GetRequiredDNSRecords(session.Hostname),
+			CertStatus:                certStatusResponse{HasCert: hasCert},
+			BackURL:                   session.BackURL,
+			BackText:                  session.BackText,
+			OwnershipVerificationMode: session.OwnershipVerificationMode,
+		}
+		switch session.OwnershipVerificationMode {
+		case portal.OwnershipVerificationModeDNSChallenge:
+			resp.OwnershipTXTRecord = &domain.DNSRecord{
+				Type:  "TXT",
+				Name:  "_certmatic-verify." + session.Hostname,
+				Value: sd.Domain.VerificationToken,
+			}
+		case portal.OwnershipVerificationModeProviderManaged:
+			resp.VerifyOwnershipURL = session.VerifyOwnershipURL
+			resp.VerifyOwnershipText = session.VerifyOwnershipText
+			if resp.VerifyOwnershipText == "" {
+				resp.VerifyOwnershipText = "Verify Ownership"
+			}
+		}
+		return resp, nil
 	})
 }
 
@@ -75,11 +96,12 @@ const (
 type checkName string
 
 const (
-	checkNameCNAMERecord       checkName = "cname_record"
-	checkNameARecord           checkName = "a_record"
-	checkNameTXTRecord         checkName = "txt_record"
-	checkNameOwnershipVerified checkName = "ownership_verified"
-	checkNameCertificate       checkName = "certificate"
+	checkNameCNAMERecord          checkName = "cname_record"
+	checkNameARecord              checkName = "a_record"
+	checkNameTXTRecord            checkName = "txt_record"
+	checkNameOwnershipVerified    checkName = "ownership_verified"
+	checkNameOwnershipTXTRecord   checkName = "ownership_txt_record"
+	checkNameCertificate          checkName = "certificate"
 )
 
 type domainCheck struct {
@@ -129,16 +151,27 @@ func (e *portalDomainEndpoint) handleDomainCheck() http.HandlerFunc {
 			}
 		}
 
+		// DNS challenge ownership check.
+		if session.OwnershipVerificationMode == portal.OwnershipVerificationModeDNSChallenge {
+			checks = append(checks, checkOwnershipTXTRecord(hostname, sd.Domain.VerificationToken))
+		}
+
 		// Ownership verified check.
 		if sd.Domain.OwnershipVerified {
 			checks = append(checks, domainCheck{
-				Name: checkNameOwnershipVerified,
+				Name:    checkNameOwnershipVerified,
 				Status:  checkStatusOK,
 				Message: "Domain ownership is verified.",
 			})
+		} else if session.OwnershipVerificationMode == portal.OwnershipVerificationModeProviderManaged {
+			checks = append(checks, domainCheck{
+				Name:    checkNameOwnershipVerified,
+				Status:  checkStatusFail,
+				Message: "Use the verify button to complete verification.",
+			})
 		} else {
 			checks = append(checks, domainCheck{
-				Name: checkNameOwnershipVerified,
+				Name:    checkNameOwnershipVerified,
 				Status:  checkStatusFail,
 				Message: "Domain ownership not yet verified. Ensure DNS records are set, then wait up to 5 minutes.",
 			})
@@ -272,6 +305,41 @@ func checkTXTRecord(name, expected string) domainCheck {
 		Expected: expected,
 		Actual:   actual,
 		Message:  "TXT record value does not match.",
+	}
+}
+
+func checkOwnershipTXTRecord(hostname, token string) domainCheck {
+	name := "_certmatic-verify." + hostname
+	txts, err := net.LookupTXT(name)
+	if err != nil {
+		return domainCheck{
+			Name:     checkNameOwnershipTXTRecord,
+			Status:   checkStatusFail,
+			Expected: token,
+			Message:  "Ownership TXT record not found: " + err.Error(),
+		}
+	}
+	for _, txt := range txts {
+		if txt == token {
+			return domainCheck{
+				Name:     checkNameOwnershipTXTRecord,
+				Status:   checkStatusOK,
+				Expected: token,
+				Actual:   txt,
+				Message:  "Ownership TXT record is correctly configured.",
+			}
+		}
+	}
+	actual := ""
+	if len(txts) > 0 {
+		actual = txts[0]
+	}
+	return domainCheck{
+		Name:     checkNameOwnershipTXTRecord,
+		Status:   checkStatusFail,
+		Expected: token,
+		Actual:   actual,
+		Message:  "Ownership TXT record value does not match.",
 	}
 }
 
