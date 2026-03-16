@@ -96,12 +96,12 @@ const (
 type checkName string
 
 const (
-	checkNameCNAMERecord          checkName = "cname_record"
-	checkNameARecord              checkName = "a_record"
-	checkNameTXTRecord            checkName = "txt_record"
-	checkNameOwnershipVerified    checkName = "ownership_verified"
-	checkNameOwnershipTXTRecord   checkName = "ownership_txt_record"
-	checkNameCertificate          checkName = "certificate"
+	checkNameCNAMERecord        checkName = "cname_record"
+	checkNameARecord            checkName = "a_record"
+	checkNameTXTRecord          checkName = "txt_record"
+	checkNameOwnershipVerified  checkName = "ownership_verified"
+	checkNameOwnershipTXTRecord checkName = "ownership_txt_record"
+	checkNameCertificate        checkName = "certificate"
 )
 
 type domainCheck struct {
@@ -153,7 +153,14 @@ func (e *portalDomainEndpoint) handleDomainCheck() http.HandlerFunc {
 
 		// DNS challenge ownership check.
 		if session.OwnershipVerificationMode == portal.OwnershipVerificationModeDNSChallenge {
-			checks = append(checks, checkOwnershipTXTRecord(hostname, sd.Domain.VerificationToken))
+			ownershipCheck := checkOwnershipTXTRecord(hostname, sd.Domain.VerificationToken)
+			checks = append(checks, ownershipCheck)
+			if ownershipCheck.Status == checkStatusOK && !sd.Domain.OwnershipVerified {
+				sd.Domain.OwnershipVerified = true
+				if err := e.domainRepo.Set(r.Context(), sd.Domain); err != nil {
+					return domainCheckResponse{}, err
+				}
+			}
 		}
 
 		// Ownership verified check.
@@ -184,19 +191,19 @@ func (e *portalDomainEndpoint) handleDomainCheck() http.HandlerFunc {
 		}
 		if hasCert {
 			checks = append(checks, domainCheck{
-				Name: checkNameCertificate,
+				Name:    checkNameCertificate,
 				Status:  checkStatusOK,
 				Message: "Certificate is issued and valid.",
 			})
 		} else if !sd.Domain.OwnershipVerified {
 			checks = append(checks, domainCheck{
-				Name: checkNameCertificate,
+				Name:    checkNameCertificate,
 				Status:  checkStatusPending,
 				Message: "Certificate not yet issued. Ownership verification is required first.",
 			})
 		} else {
 			checks = append(checks, domainCheck{
-				Name: checkNameCertificate,
+				Name:    checkNameCertificate,
 				Status:  checkStatusPending,
 				Message: "Certificate issuance in progress.",
 			})
@@ -215,7 +222,7 @@ func checkCNAME(name, expected string) domainCheck {
 	cname, err := net.LookupCNAME(name)
 	if err != nil {
 		return domainCheck{
-			Name: checkNameCNAMERecord,
+			Name:     checkNameCNAMERecord,
 			Status:   checkStatusFail,
 			Expected: expected,
 			Message:  "CNAME record not found: " + err.Error(),
@@ -224,7 +231,7 @@ func checkCNAME(name, expected string) domainCheck {
 	actual := strings.TrimSuffix(cname, ".")
 	if strings.EqualFold(actual, expected) {
 		return domainCheck{
-			Name: checkNameCNAMERecord,
+			Name:     checkNameCNAMERecord,
 			Status:   checkStatusOK,
 			Expected: expected,
 			Actual:   actual,
@@ -232,7 +239,7 @@ func checkCNAME(name, expected string) domainCheck {
 		}
 	}
 	return domainCheck{
-		Name: checkNameCNAMERecord,
+		Name:     checkNameCNAMERecord,
 		Status:   checkStatusFail,
 		Expected: expected,
 		Actual:   actual,
@@ -244,7 +251,7 @@ func checkARecord(name, expected string) domainCheck {
 	addrs, err := net.LookupHost(name)
 	if err != nil {
 		return domainCheck{
-			Name: checkNameARecord,
+			Name:     checkNameARecord,
 			Status:   checkStatusFail,
 			Expected: expected,
 			Message:  "A record not found: " + err.Error(),
@@ -253,7 +260,7 @@ func checkARecord(name, expected string) domainCheck {
 	for _, addr := range addrs {
 		if addr == expected {
 			return domainCheck{
-				Name: checkNameARecord,
+				Name:     checkNameARecord,
 				Status:   checkStatusOK,
 				Expected: expected,
 				Actual:   addr,
@@ -266,7 +273,7 @@ func checkARecord(name, expected string) domainCheck {
 		actual = addrs[0]
 	}
 	return domainCheck{
-		Name: checkNameARecord,
+		Name:     checkNameARecord,
 		Status:   checkStatusFail,
 		Expected: expected,
 		Actual:   actual,
@@ -278,7 +285,7 @@ func checkTXTRecord(name, expected string) domainCheck {
 	txts, err := net.LookupTXT(name)
 	if err != nil {
 		return domainCheck{
-			Name: checkNameTXTRecord,
+			Name:     checkNameTXTRecord,
 			Status:   checkStatusFail,
 			Expected: expected,
 			Message:  "TXT record not found: " + err.Error(),
@@ -287,7 +294,7 @@ func checkTXTRecord(name, expected string) domainCheck {
 	for _, txt := range txts {
 		if txt == expected {
 			return domainCheck{
-				Name: checkNameTXTRecord,
+				Name:     checkNameTXTRecord,
 				Status:   checkStatusOK,
 				Expected: expected,
 				Actual:   txt,
@@ -300,7 +307,7 @@ func checkTXTRecord(name, expected string) domainCheck {
 		actual = txts[0]
 	}
 	return domainCheck{
-		Name: checkNameTXTRecord,
+		Name:     checkNameTXTRecord,
 		Status:   checkStatusFail,
 		Expected: expected,
 		Actual:   actual,

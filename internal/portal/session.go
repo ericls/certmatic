@@ -22,8 +22,9 @@ type OwnershipVerificationMode string
 
 const (
 	// OwnershipVerificationModeDNSChallenge instructs the portal to show a DNS TXT record that
-	// the user must add to prove ownership. The Setup Check endpoint performs a live DNS lookup
-	// against _certmatic-verify.{hostname}. The admin API sets ownership_verified once confirmed.
+	// the user must add to prove ownership. When the user runs Setup Check, the portal performs
+	// a live DNS lookup against _certmatic-verify.{hostname} and automatically sets
+	// ownership_verified=true on the domain if the record matches.
 	OwnershipVerificationModeDNSChallenge OwnershipVerificationMode = "dns_challenge"
 
 	// OwnershipVerificationModeProviderManaged indicates that an external SaaS/provider controls
