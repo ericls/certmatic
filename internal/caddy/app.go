@@ -2,6 +2,9 @@ package caddy
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
@@ -9,48 +12,17 @@ import (
 	"github.com/caddyserver/caddy/v2/modules/caddyevents"
 	"github.com/ericls/certmatic/internal/config"
 	"github.com/ericls/certmatic/internal/dns"
+	"github.com/ericls/certmatic/internal/portal"
 	internal_domain "github.com/ericls/certmatic/internal/repo/domain"
 	"github.com/ericls/certmatic/pkg/domain"
 	"go.uber.org/zap"
 )
-
-// type FooHandler struct {
-// 	Bar string `json:"bar,omitempty"`
-// }
-
-// func (FooHandler) CaddyModule() caddy.ModuleInfo {
-// 	return caddy.ModuleInfo{
-// 		ID:  "http.handlers.certmatic_foo",
-// 		New: func() caddy.Module { return new(FooHandler) },
-// 	}
-// }
-
-// func (h *FooHandler) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
-// 	w.WriteHeader(http.StatusOK)
-// 	w.Header().Set("Content-Type", "text/plain")
-// 	w.Header().Set("X-Foo", "Bar")
-// 	w.Write([]byte("FooHandler: " + h.Bar + "\n"))
-// 	return nil
-// }
-
-// func parseCaddyfileAsk(d httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error) {
-// 	h := &FooHandler{
-// 		Bar: "default",
-// 	}
-// 	d.NextArg()
-// 	if d.NextArg() {
-// 		h.Bar = d.Val()
-// 	}
-// 	return h, nil
-// }
 
 var usagePool = caddy.NewUsagePool()
 
 func init() {
 	caddy.RegisterModule(App{})
 	httpcaddyfile.RegisterGlobalOption("certmatic", parseGlobalCertmatic)
-	// caddy.RegisterModule(FooHandler{})
-	// httpcaddyfile.RegisterHandlerDirective("certmatic_foo", parseCaddyfileAsk)
 }
 
 type App struct {
@@ -58,13 +30,16 @@ type App struct {
 	ChallengeType       dns.ChallengeType `json:"challenge_type,omitempty"`
 	DNSDelegationDomain string            `json:"dns_delegation_domain,omitempty"`
 	CNameTarget         string            `json:"cname_target,omitempty"`
-
-	// Foo string `json:"foo,omitempty"`
+	PortalSigningKey    string            `json:"portal_signing_key,omitempty"`
+	PortalBaseURL       string            `json:"portal_base_url,omitempty"`
+	PortalDevMode       bool              `json:"portal_dev_mode,omitempty"`
 
 	logger           zap.Logger            `json:"-"`
 	config           config.Config         `json:"-"`
 	domainRepo       domain.DomainRepo     `json:"-"`
 	dnsRecordManager *dns.DNSRecordManager `json:"-"`
+	sessionStore     portal.SessionStore   `json:"-"`
+	signingKeyBytes  []byte                `json:"-"`
 }
 
 func (App) CaddyModule() caddy.ModuleInfo {
@@ -93,34 +68,47 @@ func (a *App) Stop() error {
 func (a *App) Provision(ctx caddy.Context) error {
 	a.logger = *ctx.Logger(a)
 	a.logger.Debug("provisioning certmatic app")
-	// evts, err := ctx.App("events")
-	// if err != nil {
-	// 	a.logger.Error("failed to get events app", zap.Error(err))
-	// 	return err
-	// }
-	// events_app := evts.(*caddyevents.App)
-	// events_app.Subscribe(&caddyevents.Subscription{
-	// 	Events:   []string{"cert_obtaining", "cert_obtained", "cert_failed"},
-	// 	Modules:  []caddy.ModuleID{"tls"}, // optional: filter by origin module
-	// 	Handlers: []caddyevents.Handler{a},
-	// })
-	// storage := ctx.Storage()
-	// keys, err := storage.List(ctx, "", true)
-	// if err != nil {
-	// 	return err
-	// }
-	// a.logger.Debug("storage keys", zap.Int("count", len(keys)), zap.Strings("keys", keys))
+
 	domainRepo, _, err := usagePool.LoadOrNew("domainRepo", func() (caddy.Destructor, error) {
 		return internal_domain.NewDomainStoreFromConfig(a.DomainStore)
 	})
-	// domainRepo, err := internal_domain.NewDomainStoreFromConfig(a.DomainStore)
 	if err != nil {
 		a.logger.Error("failed to create or load domain store from config", zap.Error(err))
 		return err
 	}
 	a.domainRepo = domainRepo.(domain.DomainRepo)
+
 	dnsRecordManager := dns.NewDNSRecordManager(a.ChallengeType, a.DNSDelegationDomain, a.CNameTarget)
 	a.dnsRecordManager = dnsRecordManager
+
+	// Portal signing key
+	if a.PortalSigningKey != "" {
+		key, err := hex.DecodeString(a.PortalSigningKey)
+		if err != nil {
+			return fmt.Errorf("portal_signing_key must be a hex-encoded byte string (got decode error: %w)", err)
+		}
+		if len(key) < 16 {
+			return fmt.Errorf("portal_signing_key must be at least 16 bytes (got %d)", len(key))
+		}
+		a.signingKeyBytes = key
+	} else {
+		a.logger.Warn("portal_signing_key not set; using ephemeral random key — portal tokens will not survive restarts")
+		key := make([]byte, 32)
+		if _, err := rand.Read(key); err != nil {
+			return fmt.Errorf("generate ephemeral portal signing key: %w", err)
+		}
+		a.signingKeyBytes = key
+	}
+
+	// Portal session store (survives hot-reloads via usagePool)
+	sessionStoreVal, _, err := usagePool.LoadOrNew("portalSessionStore", func() (caddy.Destructor, error) {
+		return portal.NewMemorySessionStore(), nil
+	})
+	if err != nil {
+		return fmt.Errorf("create portal session store: %w", err)
+	}
+	a.sessionStore = sessionStoreVal.(portal.SessionStore)
+
 	return nil
 }
 

@@ -12,6 +12,8 @@
 		# challenge_type dns-01
 		# dns_delegation_domain _acme-challenge.example.com
 		cname_target dispatcher.linki.la
+		portal_base_url http://localhost:33001/portal
+		portal_dev_mode
 	}
 
 	local_certs
@@ -23,9 +25,19 @@
 	respond "{http.request.host}" 200
 }
 
-# certmatic admin endpoint
+# certmatic admin + portal
 :33001 {
 	handle_path /admin/* {
 		certmatic_admin
+	}
+
+	handle_path /portal/* {
+		certmatic_portal
+	}
+
+	# In dev, Caddy proxies /web_client/* directly to the Vite dev server.
+	# In production, replace this block with: handle_path /web_client/portal/* { certmatic_portal_assets }
+	handle /web_client/* {
+		reverse_proxy localhost:5173
 	}
 }
