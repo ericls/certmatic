@@ -12,10 +12,17 @@ type StoredDomain struct {
 	Source   string        `json:"source,omitempty" yaml:"source,omitempty"`
 }
 
+type DomainPatch struct {
+	TenantID          *string
+	OwnershipVerified *bool
+	VerificationToken *string
+}
+
 type DomainRepo interface {
 	UniqueID() string
 	Get(ctx context.Context, hostname string) (*StoredDomain, error)
 	Set(ctx context.Context, domain *Domain) error
+	Patch(ctx context.Context, hostname string, patch DomainPatch) error
 	Delete(ctx context.Context, hostname string) error
 	// Invalidate(ctx context.Context, hostname string) error
 
