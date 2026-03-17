@@ -68,6 +68,26 @@ func (repo *InMemoryDomainRepo) Delete(ctx context.Context, hostname string) err
 	return nil
 }
 
+// Patch applies non-nil fields from patch to the stored domain.
+func (repo *InMemoryDomainRepo) Patch(ctx context.Context, hostname string, patch domain.DomainPatch) error {
+	repo.mu.Lock()
+	defer repo.mu.Unlock()
+	stored, exists := repo.domains[hostname]
+	if !exists {
+		return domain.ErrNotFound
+	}
+	if patch.TenantID != nil {
+		stored.Domain.TenantID = *patch.TenantID
+	}
+	if patch.OwnershipVerified != nil {
+		stored.Domain.OwnershipVerified = *patch.OwnershipVerified
+	}
+	if patch.VerificationToken != nil {
+		stored.Domain.VerificationToken = *patch.VerificationToken
+	}
+	return nil
+}
+
 // Invalidate marks a domain as invalid/stale by removing it.
 // func (repo *InMemoryDomainRepo) Invalidate(ctx context.Context, hostname string) error {
 // 	repo.mu.Lock()

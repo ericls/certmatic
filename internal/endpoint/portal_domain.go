@@ -156,10 +156,11 @@ func (e *portalDomainEndpoint) handleDomainCheck() http.HandlerFunc {
 			ownershipCheck := checkOwnershipTXTRecord(hostname, sd.Domain.VerificationToken)
 			checks = append(checks, ownershipCheck)
 			if ownershipCheck.Status == checkStatusOK && !sd.Domain.OwnershipVerified {
-				sd.Domain.OwnershipVerified = true
-				if err := e.domainRepo.Set(r.Context(), sd.Domain); err != nil {
+				verified := true
+				if err := e.domainRepo.Patch(r.Context(), hostname, domain.DomainPatch{OwnershipVerified: &verified}); err != nil {
 					return domainCheckResponse{}, err
 				}
+				sd.Domain.OwnershipVerified = true // update local copy for downstream checks in this response
 			}
 		}
 
