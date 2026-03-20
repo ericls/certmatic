@@ -74,6 +74,13 @@ export function runDomainCheck(): Promise<DomainCheckReport> {
   });
 }
 
-export async function pokeCert(): Promise<void> {
-  await apiRequest<unknown>(`${getApiBase()}/domain/cert`, { method: "POST" });
+export interface IssuedCert {
+  hostname: string;
+  not_before: string;
+  not_after: string;
+  issuer: string;
+}
+
+export async function ensureCert(): Promise<IssuedCert> {
+  return apiRequest<IssuedCert>(`${getApiBase()}/domain/cert/ensure`, { method: "POST" });
 }
