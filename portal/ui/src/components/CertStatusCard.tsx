@@ -1,12 +1,12 @@
-import type { CertStatus } from "../api/client";
+import type { CertInfo } from "../api/client";
 
 interface Props {
-  certStatus: CertStatus;
+  cert: CertInfo | null;
   ownershipVerified: boolean;
 }
 
-export function CertStatusCard({ certStatus, ownershipVerified }: Props) {
-  if (certStatus.has_cert) {
+export function CertStatusCard({ cert, ownershipVerified }: Props) {
+  if (cert !== null) {
     return (
       <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
         <span className="text-green-600 dark:text-green-400 text-lg">✓</span>
