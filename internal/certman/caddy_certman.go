@@ -71,6 +71,23 @@ func (c *CaddyCertMan) PokeCert(ctx context.Context, hostname string) error {
 	return c.tlsApp.Manage(map[string]struct{}{hostname: {}})
 }
 
+func (c *CaddyCertMan) DeleteCert(ctx context.Context, hostname string) error {
+	// Similar to GetCertInfo, we need to find the correct key in storage and delete it.
+	prefix := "certificates/"
+	keys, err := c.storage.List(ctx, prefix, false)
+	if err != nil {
+		return err
+	}
+
+	for _, issuerDir := range keys {
+		certKey := issuerDir + "/" + hostname + "/" + hostname + ".crt"
+		if c.storage.Exists(ctx, certKey) {
+			return c.storage.Delete(ctx, certKey)
+		}
+	}
+	return nil
+}
+
 func parseCertInfo(hostname string, certData []byte) (*CertInfo, error) {
 	block, _ := pem.Decode(certData)
 	if block == nil {

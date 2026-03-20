@@ -16,6 +16,7 @@ type mockCertMan struct {
 	hasCertFn     func(ctx context.Context, hostname string) (bool, error)
 	getCertInfoFn func(ctx context.Context, hostname string) (*certman.CertInfo, error)
 	pokeCertFn    func(ctx context.Context, hostname string) error
+	deleteCertFn  func(ctx context.Context, hostname string) error
 }
 
 func (m *mockCertMan) HasCert(ctx context.Context, hostname string) (bool, error) {
@@ -28,6 +29,10 @@ func (m *mockCertMan) GetCertInfo(ctx context.Context, hostname string) (*certma
 
 func (m *mockCertMan) PokeCert(ctx context.Context, hostname string) error {
 	return m.pokeCertFn(ctx, hostname)
+}
+
+func (m *mockCertMan) DeleteCert(ctx context.Context, hostname string) error {
+	return m.deleteCertFn(ctx, hostname)
 }
 
 func validCert(hostname string) *certman.CertInfo {
@@ -305,5 +310,37 @@ func TestPokeAndWaitCert_Timeout(t *testing.T) {
 
 	if rec.Code != http.StatusGatewayTimeout {
 		t.Errorf("expected %d, got %d", http.StatusGatewayTimeout, rec.Code)
+	}
+}
+
+// --- handleDeleteCert (DELETE /{hostname}) ---
+
+func TestDeleteCert_Success(t *testing.T) {
+	cm := &mockCertMan{
+		deleteCertFn: func(_ context.Context, _ string) error { return nil },
+	}
+	router := setupCertAdminRouter(cm)
+
+	req := httptest.NewRequest(http.MethodDelete, "/example.com", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Errorf("expected %d, got %d", http.StatusNoContent, rec.Code)
+	}
+}
+
+func TestDeleteCert_Error(t *testing.T) {
+	cm := &mockCertMan{
+		deleteCertFn: func(_ context.Context, _ string) error { return errors.New("storage error") },
+	}
+	router := setupCertAdminRouter(cm)
+
+	req := httptest.NewRequest(http.MethodDelete, "/example.com", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Errorf("expected %d, got %d", http.StatusInternalServerError, rec.Code)
 	}
 }

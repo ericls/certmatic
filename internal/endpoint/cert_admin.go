@@ -40,6 +40,7 @@ func (e *CertAdminEndpoint) BuildCertAdminRouter() chi.Router {
 	r.Get("/{hostname}", e.handleCertGet())
 	r.Post("/{hostname}/poke", e.handlePokeCert())
 	r.Post("/{hostname}/ensure", e.handlePokeAndWaitCert())
+	r.Delete("/{hostname}", e.handleDeleteCert())
 	return r
 }
 
@@ -142,4 +143,16 @@ func (e *CertAdminEndpoint) handlePokeAndWaitCert() http.HandlerFunc {
 			Issuer:    certInfo.Issuer,
 		}, nil
 	})
+}
+
+func (e *CertAdminEndpoint) handleDeleteCert() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		hostname := chi.URLParam(r, "hostname")
+		err := e.certMan.DeleteCert(r.Context(), hostname)
+		if err != nil {
+			http.Error(w, "Error deleting certificate: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
 }

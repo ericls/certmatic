@@ -21,4 +21,7 @@ type CertMan interface {
 
 	// PokeCert triggers the certificate issuance process for the given hostname.
 	PokeCert(ctx context.Context, hostname string) error
+
+	// DeleteCert removes a matching certificate from storage, if it exists. This is useful for testing and cleanup.
+	DeleteCert(ctx context.Context, hostname string) error
 }
