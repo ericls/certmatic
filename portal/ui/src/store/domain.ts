@@ -1,9 +1,9 @@
 import {
   getDomainInfo,
-  pokeCert as apiPokeCert,
+  ensureCert as apiEnsureCert,
   runDomainCheck as apiRunDomainCheck,
 } from "../api/client";
-import type { DomainInfo, DomainCheckReport } from "../api/client";
+import type { DomainInfo, DomainCheckReport, IssuedCert } from "../api/client";
 
 export type DomainStoreState =
   | { status: "idle" }
@@ -52,8 +52,9 @@ export const domainStore = {
     return report;
   },
 
-  async pokeCert(): Promise<void> {
-    await apiPokeCert();
+  async ensureCert(): Promise<IssuedCert> {
+    const cert = await apiEnsureCert();
     await refresh();
+    return cert;
   },
 };

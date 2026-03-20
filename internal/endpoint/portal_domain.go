@@ -1,9 +1,11 @@
 package endpoint
 
 import (
+	"fmt"
 	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/ericls/certmatic/internal/certman"
 	"github.com/ericls/certmatic/internal/dns"
@@ -15,6 +17,8 @@ type portalDomainEndpoint struct {
 	domainRepo       domain.DomainRepo
 	dnsRecordManager *dns.DNSRecordManager
 	certMan          certman.CertMan
+	certWaitTimeout  time.Duration
+	certPollInterval time.Duration
 }
 
 // --- GET /portal/api/domain ---
@@ -118,19 +122,53 @@ type domainCheckResponse struct {
 	Overall  checkStatus   `json:"overall"`
 }
 
-func (e *portalDomainEndpoint) handlePokeCert() http.HandlerFunc {
-	return JSONHandler(http.StatusOK, func(r *http.Request, _ struct{}) (struct{}, error) {
+type portalEnsureCertResponse struct {
+	Hostname  string    `json:"hostname"`
+	NotBefore time.Time `json:"not_before"`
+	NotAfter  time.Time `json:"not_after"`
+	Issuer    string    `json:"issuer"`
+}
+
+func (e *portalDomainEndpoint) handleEnsureCert() http.HandlerFunc {
+	return JSONHandler(http.StatusOK, func(r *http.Request, _ struct{}) (portalEnsureCertResponse, error) {
 		session := sessionFromContext(r.Context())
 		if session == nil {
-			return struct{}{}, HTTPError{Status: http.StatusUnauthorized, Message: "session required"}
+			return portalEnsureCertResponse{}, HTTPError{Status: http.StatusUnauthorized, Message: "session required"}
 		}
 		if e.certMan == nil {
-			return struct{}{}, HTTPError{Status: http.StatusServiceUnavailable, Message: "cert manager not available"}
+			return portalEnsureCertResponse{}, HTTPError{Status: http.StatusServiceUnavailable, Message: "cert manager not available"}
 		}
-		if err := e.certMan.PokeCert(r.Context(), session.Hostname); err != nil {
-			return struct{}{}, err
+		hostname := session.Hostname
+		if err := e.certMan.PokeCert(r.Context(), hostname); err != nil {
+			return portalEnsureCertResponse{}, HTTPError{Status: http.StatusInternalServerError, Message: fmt.Sprintf("error requesting certificate: %v", err)}
 		}
-		return struct{}{}, nil
+		timeout := time.After(e.certWaitTimeout)
+		waitDuration := e.certPollInterval
+		for {
+			certInfo, err := e.certMan.GetCertInfo(r.Context(), hostname)
+			if err != nil {
+				return portalEnsureCertResponse{}, HTTPError{Status: http.StatusInternalServerError, Message: fmt.Sprintf("error checking certificate: %v", err)}
+			}
+			if certInfo != nil && certInfo.NotAfter.After(time.Now()) && certInfo.NotBefore.Before(time.Now()) {
+				return portalEnsureCertResponse{
+					Hostname:  certInfo.Hostname,
+					NotBefore: certInfo.NotBefore,
+					NotAfter:  certInfo.NotAfter,
+					Issuer:    certInfo.Issuer,
+				}, nil
+			}
+			select {
+			case <-timeout:
+				return portalEnsureCertResponse{}, HTTPError{Status: http.StatusGatewayTimeout, Message: "timed out waiting for certificate to be issued"}
+			case <-r.Context().Done():
+				return portalEnsureCertResponse{}, HTTPError{Status: http.StatusServiceUnavailable, Message: "request cancelled"}
+			default:
+				time.Sleep(waitDuration)
+				if waitDuration < 10*time.Second {
+					waitDuration += e.certPollInterval
+				}
+			}
+		}
 	})
 }
 

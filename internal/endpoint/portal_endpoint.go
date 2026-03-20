@@ -6,12 +6,13 @@ import (
 	"io/fs"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/ericls/certmatic/internal/certman"
 	"github.com/ericls/certmatic/internal/dns"
 	"github.com/ericls/certmatic/internal/portal"
-	portalstatic "github.com/ericls/certmatic/portal"
 	"github.com/ericls/certmatic/pkg/domain"
+	portalstatic "github.com/ericls/certmatic/portal"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"go.uber.org/zap"
@@ -36,11 +37,14 @@ func MakePortalRouter(
 ) chi.Router {
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
+	r.Use(middleware.RequestLogger(&ZapFormatter{Logger: logger}))
 
 	de := &portalDomainEndpoint{
 		domainRepo:       domainRepo,
 		dnsRecordManager: dnsRecordManager,
 		certMan:          certMan,
+		certWaitTimeout:  2 * time.Minute,
+		certPollInterval: 2 * time.Second,
 	}
 
 	// Root: token exchange only.
@@ -61,7 +65,7 @@ func MakePortalRouter(
 		})
 		r.Get("/api/domain", de.handleGetDomain())
 		r.Post("/api/domain/check", de.handleDomainCheck())
-		r.Post("/api/domain/cert", de.handlePokeCert())
+		r.Post("/api/domain/cert/ensure", de.handleEnsureCert())
 	})
 
 	return r

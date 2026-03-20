@@ -5,7 +5,7 @@ import { RequiredRecords } from "../components/RequiredRecords";
 import { CertStatusCard } from "../components/CertStatusCard";
 import { DoctorReport } from "../components/DoctorReport";
 import { StatusBadge } from "../components/StatusBadge";
-import type { DomainCheckReport } from "../api/client";
+import type { DomainCheckReport, IssuedCert } from "../api/client";
 
 interface Props {
   onBackButton: (back: { url: string; text: string } | null) => void;
@@ -18,8 +18,11 @@ export function DomainSetup({ onBackButton }: Props) {
   const [checkError, setCheckError] = useState<string | null>(null);
   const [poking, setPoking] = useState(false);
   const [pokeError, setPokeError] = useState<string | null>(null);
+  const [issuedCert, setIssuedCert] = useState<IssuedCert | null>(null);
 
-  useEffect(() => { domainStore.load(); }, []);
+  useEffect(() => {
+    domainStore.load();
+  }, []);
 
   useEffect(() => {
     if (storeState.status !== "ready") return;
@@ -30,8 +33,10 @@ export function DomainSetup({ onBackButton }: Props) {
   const handlePokeCert = async () => {
     setPoking(true);
     setPokeError(null);
+    setIssuedCert(null);
     try {
-      await domainStore.pokeCert();
+      const cert = await domainStore.ensureCert();
+      setIssuedCert(cert);
     } catch (e: unknown) {
       setPokeError(e instanceof Error ? e.message : "Unknown error");
     } finally {
@@ -45,7 +50,7 @@ export function DomainSetup({ onBackButton }: Props) {
     try {
       const report = await domainStore.runDomainCheck();
       setCheckReport(report);
-      if (report.overall === "ok") {
+      if (report.overall === "ok" && storeState.status !== "ready") {
         await handlePokeCert();
       }
     } catch (e: unknown) {
@@ -83,7 +88,9 @@ export function DomainSetup({ onBackButton }: Props) {
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{domain.hostname}</h1>
         <div className="mt-1 flex items-center gap-2">
           <span className="text-sm text-gray-500 dark:text-gray-400">Ownership:</span>
-          <StatusBadge status={domain.ownership_verified || domain.cert_status.has_cert ? "ok" : "pending"} />
+          <StatusBadge
+            status={domain.ownership_verified || domain.cert_status.has_cert ? "ok" : "pending"}
+          />
           {!domain.ownership_verified &&
             !domain.cert_status.has_cert &&
             domain.ownership_verification_mode === "provider_managed" &&
@@ -140,10 +147,16 @@ export function DomainSetup({ onBackButton }: Props) {
               disabled={poking}
               className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {poking ? "Requesting…" : "Issue Certificate"}
+              {poking ? "Issuing…" : "Issue Certificate"}
             </button>
             {pokeError && (
               <p className="mt-2 text-sm text-red-600 dark:text-red-400">{pokeError}</p>
+            )}
+            {issuedCert && (
+              <p className="mt-2 text-sm text-green-600 dark:text-green-400">
+                Certificate issued. Valid until{" "}
+                {new Date(issuedCert.not_after).toLocaleDateString()}.
+              </p>
             )}
           </div>
         )}
