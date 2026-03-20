@@ -23,15 +23,17 @@ type portalDomainEndpoint struct {
 
 // --- GET /portal/api/domain ---
 
-type certStatusResponse struct {
-	HasCert bool `json:"has_cert"`
+type certInfoResponse struct {
+	NotBefore time.Time `json:"not_before"`
+	NotAfter  time.Time `json:"not_after"`
+	Issuer    string    `json:"issuer"`
 }
 
 type portalDomainResponse struct {
 	Hostname                  string                           `json:"hostname"`
 	OwnershipVerified         bool                             `json:"ownership_verified"`
 	RequiredDNSRecords        []domain.DNSRecord               `json:"required_dns_records"`
-	CertStatus                certStatusResponse               `json:"cert_status"`
+	Cert                      *certInfoResponse                `json:"cert"`
 	BackURL                   string                           `json:"back_url,omitempty"`
 	BackText                  string                           `json:"back_text,omitempty"`
 	OwnershipVerificationMode portal.OwnershipVerificationMode `json:"ownership_verification_mode,omitempty"`
@@ -55,16 +57,18 @@ func (e *portalDomainEndpoint) handleGetDomain() http.HandlerFunc {
 			return portalDomainResponse{}, err
 		}
 
-		hasCert := false
+		var cert *certInfoResponse
 		if e.certMan != nil {
-			hasCert, _ = e.certMan.HasCert(r.Context(), session.Hostname)
+			if info, _ := e.certMan.GetCertInfo(r.Context(), session.Hostname); info != nil {
+				cert = &certInfoResponse{NotBefore: info.NotBefore, NotAfter: info.NotAfter, Issuer: info.Issuer}
+			}
 		}
 
 		resp := portalDomainResponse{
 			Hostname:                  sd.Domain.Hostname,
 			OwnershipVerified:         sd.Domain.OwnershipVerified,
 			RequiredDNSRecords:        e.dnsRecordManager.GetRequiredDNSRecords(session.Hostname),
-			CertStatus:                certStatusResponse{HasCert: hasCert},
+			Cert:                      cert,
 			BackURL:                   session.BackURL,
 			BackText:                  session.BackText,
 			OwnershipVerificationMode: session.OwnershipVerificationMode,
@@ -123,10 +127,8 @@ type domainCheckResponse struct {
 }
 
 type portalEnsureCertResponse struct {
-	Hostname  string    `json:"hostname"`
-	NotBefore time.Time `json:"not_before"`
-	NotAfter  time.Time `json:"not_after"`
-	Issuer    string    `json:"issuer"`
+	Hostname string `json:"hostname"`
+	certInfoResponse
 }
 
 func (e *portalDomainEndpoint) handleEnsureCert() http.HandlerFunc {
@@ -151,10 +153,8 @@ func (e *portalDomainEndpoint) handleEnsureCert() http.HandlerFunc {
 			}
 			if certInfo != nil && certInfo.NotAfter.After(time.Now()) && certInfo.NotBefore.Before(time.Now()) {
 				return portalEnsureCertResponse{
-					Hostname:  certInfo.Hostname,
-					NotBefore: certInfo.NotBefore,
-					NotAfter:  certInfo.NotAfter,
-					Issuer:    certInfo.Issuer,
+					Hostname:         certInfo.Hostname,
+					certInfoResponse: certInfoResponse{NotBefore: certInfo.NotBefore, NotAfter: certInfo.NotAfter, Issuer: certInfo.Issuer},
 				}, nil
 			}
 			select {
