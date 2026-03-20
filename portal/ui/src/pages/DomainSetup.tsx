@@ -1,37 +1,53 @@
 import { useEffect, useState } from "react";
-import type { DomainInfo, DomainCheckReport } from "../api/client";
-import { getDomainInfo, runDomainCheck } from "../api/client";
+import { domainStore } from "../store/domain";
+import { useDomain } from "../hooks/useDomain";
 import { RequiredRecords } from "../components/RequiredRecords";
 import { CertStatusCard } from "../components/CertStatusCard";
 import { DoctorReport } from "../components/DoctorReport";
 import { StatusBadge } from "../components/StatusBadge";
+import type { DomainCheckReport } from "../api/client";
 
 interface Props {
   onBackButton: (back: { url: string; text: string } | null) => void;
 }
 
 export function DomainSetup({ onBackButton }: Props) {
-  const [domain, setDomain] = useState<DomainInfo | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const storeState = useDomain();
   const [checkReport, setCheckReport] = useState<DomainCheckReport | null>(null);
   const [checking, setChecking] = useState(false);
   const [checkError, setCheckError] = useState<string | null>(null);
+  const [poking, setPoking] = useState(false);
+  const [pokeError, setPokeError] = useState<string | null>(null);
+
+  useEffect(() => { domainStore.load(); }, []);
 
   useEffect(() => {
-    getDomainInfo()
-      .then((d) => {
-        setDomain(d);
-        onBackButton(d.back_url ? { url: d.back_url, text: d.back_text || "Back" } : null);
-      })
-      .catch((e: Error) => setLoadError(e.message));
-  }, [onBackButton]);
+    if (storeState.status !== "ready") return;
+    const d = storeState.domain;
+    onBackButton(d.back_url ? { url: d.back_url, text: d.back_text || "Back" } : null);
+  }, [storeState, onBackButton]);
+
+  const handlePokeCert = async () => {
+    setPoking(true);
+    setPokeError(null);
+    try {
+      await domainStore.pokeCert();
+    } catch (e: unknown) {
+      setPokeError(e instanceof Error ? e.message : "Unknown error");
+    } finally {
+      setPoking(false);
+    }
+  };
 
   const handleRunCheck = async () => {
     setChecking(true);
     setCheckError(null);
     try {
-      const report = await runDomainCheck();
+      const report = await domainStore.runDomainCheck();
       setCheckReport(report);
+      if (report.overall === "ok") {
+        await handlePokeCert();
+      }
     } catch (e: unknown) {
       setCheckError(e instanceof Error ? e.message : "Unknown error");
     } finally {
@@ -39,24 +55,26 @@ export function DomainSetup({ onBackButton }: Props) {
     }
   };
 
-  if (loadError) {
+  if (storeState.status === "error") {
     return (
       <div className="max-w-3xl mx-auto px-4 py-8">
         <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-5">
           <p className="font-semibold text-red-800 dark:text-red-300">Failed to load domain info</p>
-          <p className="mt-1 text-sm text-red-600 dark:text-red-400">{loadError}</p>
+          <p className="mt-1 text-sm text-red-600 dark:text-red-400">{storeState.error}</p>
         </div>
       </div>
     );
   }
 
-  if (!domain) {
+  if (storeState.status !== "ready") {
     return (
       <div className="p-6 text-gray-500 dark:text-gray-400 text-sm max-w-3xl mx-auto px-4 py-8 space-y-8">
         Loading…
       </div>
     );
   }
+
+  const domain = storeState.domain;
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-8">
@@ -65,8 +83,9 @@ export function DomainSetup({ onBackButton }: Props) {
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{domain.hostname}</h1>
         <div className="mt-1 flex items-center gap-2">
           <span className="text-sm text-gray-500 dark:text-gray-400">Ownership:</span>
-          <StatusBadge status={domain.ownership_verified ? "ok" : "pending"} />
+          <StatusBadge status={domain.ownership_verified || domain.cert_status.has_cert ? "ok" : "pending"} />
           {!domain.ownership_verified &&
+            !domain.cert_status.has_cert &&
             domain.ownership_verification_mode === "provider_managed" &&
             domain.verify_ownership_url && (
               <a
@@ -114,6 +133,20 @@ export function DomainSetup({ onBackButton }: Props) {
           certStatus={domain.cert_status}
           ownershipVerified={domain.ownership_verified}
         />
+        {domain.ownership_verified && !domain.cert_status.has_cert && (
+          <div className="mt-3">
+            <button
+              onClick={handlePokeCert}
+              disabled={poking}
+              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {poking ? "Requesting…" : "Issue Certificate"}
+            </button>
+            {pokeError && (
+              <p className="mt-2 text-sm text-red-600 dark:text-red-400">{pokeError}</p>
+            )}
+          </div>
+        )}
       </section>
 
       {/* Setup Doctor */}

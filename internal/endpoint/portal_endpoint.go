@@ -61,6 +61,7 @@ func MakePortalRouter(
 		})
 		r.Get("/api/domain", de.handleGetDomain())
 		r.Post("/api/domain/check", de.handleDomainCheck())
+		r.Post("/api/domain/cert", de.handlePokeCert())
 	})
 
 	return r
