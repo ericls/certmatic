@@ -4,15 +4,17 @@ export interface DNSRecord {
   value: string;
 }
 
-export interface CertStatus {
-  has_cert: boolean;
+export interface CertInfo {
+  not_before: string;
+  not_after: string;
+  issuer: string;
 }
 
 export interface DomainInfo {
   hostname: string;
   ownership_verified: boolean;
   required_dns_records: DNSRecord[];
-  cert_status: CertStatus;
+  cert: CertInfo | null;
   back_url?: string;
   back_text?: string;
   ownership_verification_mode?: "dns_challenge" | "provider_managed" | "";
@@ -74,13 +76,10 @@ export function runDomainCheck(): Promise<DomainCheckReport> {
   });
 }
 
-export interface IssuedCert {
+export interface EnsuredCert extends CertInfo {
   hostname: string;
-  not_before: string;
-  not_after: string;
-  issuer: string;
 }
 
-export async function ensureCert(): Promise<IssuedCert> {
+export async function ensureCert(): Promise<EnsuredCert> {
   return apiRequest<IssuedCert>(`${getApiBase()}/domain/cert/ensure`, { method: "POST" });
 }

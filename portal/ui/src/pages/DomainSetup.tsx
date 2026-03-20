@@ -5,7 +5,7 @@ import { RequiredRecords } from "../components/RequiredRecords";
 import { CertStatusCard } from "../components/CertStatusCard";
 import { DoctorReport } from "../components/DoctorReport";
 import { StatusBadge } from "../components/StatusBadge";
-import type { DomainCheckReport, IssuedCert } from "../api/client";
+import type { DomainCheckReport, EnsuredCert } from "../api/client";
 
 interface Props {
   onBackButton: (back: { url: string; text: string } | null) => void;
@@ -18,7 +18,7 @@ export function DomainSetup({ onBackButton }: Props) {
   const [checkError, setCheckError] = useState<string | null>(null);
   const [poking, setPoking] = useState(false);
   const [pokeError, setPokeError] = useState<string | null>(null);
-  const [issuedCert, setIssuedCert] = useState<IssuedCert | null>(null);
+  const [issuedCert, setIssuedCert] = useState<EnsuredCert | null>(null);
 
   useEffect(() => {
     domainStore.load();
@@ -30,13 +30,14 @@ export function DomainSetup({ onBackButton }: Props) {
     onBackButton(d.back_url ? { url: d.back_url, text: d.back_text || "Back" } : null);
   }, [storeState, onBackButton]);
 
-  const handlePokeCert = async () => {
+  const handleEnsureCert = async () => {
     setPoking(true);
     setPokeError(null);
     setIssuedCert(null);
     try {
       const cert = await domainStore.ensureCert();
       setIssuedCert(cert);
+      setCheckReport(null);
     } catch (e: unknown) {
       setPokeError(e instanceof Error ? e.message : "Unknown error");
     } finally {
@@ -50,8 +51,8 @@ export function DomainSetup({ onBackButton }: Props) {
     try {
       const report = await domainStore.runDomainCheck();
       setCheckReport(report);
-      if (report.overall === "ok" && storeState.status !== "ready") {
-        await handlePokeCert();
+      if (report.overall === "pending" && storeState.domain?.cert === null) {
+        await handleEnsureCert();
       }
     } catch (e: unknown) {
       setCheckError(e instanceof Error ? e.message : "Unknown error");
@@ -89,10 +90,10 @@ export function DomainSetup({ onBackButton }: Props) {
         <div className="mt-1 flex items-center gap-2">
           <span className="text-sm text-gray-500 dark:text-gray-400">Ownership:</span>
           <StatusBadge
-            status={domain.ownership_verified || domain.cert_status.has_cert ? "ok" : "pending"}
+            status={domain.ownership_verified || domain.cert !== null ? "ok" : "pending"}
           />
           {!domain.ownership_verified &&
-            !domain.cert_status.has_cert &&
+            domain.cert === null &&
             domain.ownership_verification_mode === "provider_managed" &&
             domain.verify_ownership_url && (
               <a
@@ -136,14 +137,11 @@ export function DomainSetup({ onBackButton }: Props) {
         <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3">
           Certificate Status
         </h2>
-        <CertStatusCard
-          certStatus={domain.cert_status}
-          ownershipVerified={domain.ownership_verified}
-        />
-        {domain.ownership_verified && !domain.cert_status.has_cert && (
+        <CertStatusCard cert={domain.cert} ownershipVerified={domain.ownership_verified} />
+        {domain.ownership_verified && domain.cert === null && (
           <div className="mt-3">
             <button
-              onClick={handlePokeCert}
+              onClick={handleEnsureCert}
               disabled={poking}
               className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >

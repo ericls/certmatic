@@ -3,15 +3,15 @@ import {
   ensureCert as apiEnsureCert,
   runDomainCheck as apiRunDomainCheck,
 } from "../api/client";
-import type { DomainInfo, DomainCheckReport, IssuedCert } from "../api/client";
+import type { DomainInfo, DomainCheckReport, EnsuredCert } from "../api/client";
 
 export type DomainStoreState =
-  | { status: "idle" }
-  | { status: "loading" }
-  | { status: "error"; error: string }
+  | { status: "idle"; domain: undefined }
+  | { status: "loading"; domain: undefined }
+  | { status: "error"; error: string; domain: undefined }
   | { status: "ready"; domain: DomainInfo };
 
-let state: DomainStoreState = { status: "idle" };
+let state: DomainStoreState = { status: "idle", domain: undefined };
 const listeners = new Set<() => void>();
 
 function setState(next: DomainStoreState): void {
@@ -24,7 +24,7 @@ async function refresh(): Promise<void> {
     const domain = await getDomainInfo();
     setState({ status: "ready", domain });
   } catch (e) {
-    setState({ status: "error", error: (e as Error).message });
+    setState({ status: "error", error: (e as Error).message, domain: undefined });
   }
 }
 
@@ -41,7 +41,7 @@ export const domainStore = {
   // Idempotent initial fetch — safe to call on every mount
   load(): void {
     if (state.status === "loading" || state.status === "ready") return;
-    setState({ status: "loading" });
+    setState({ status: "loading", domain: undefined });
     refresh();
   },
 
@@ -52,7 +52,7 @@ export const domainStore = {
     return report;
   },
 
-  async ensureCert(): Promise<IssuedCert> {
+  async ensureCert(): Promise<EnsuredCert> {
     const cert = await apiEnsureCert();
     await refresh();
     return cert;
