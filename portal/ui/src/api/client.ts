@@ -73,3 +73,7 @@ export function runDomainCheck(): Promise<DomainCheckReport> {
     method: "POST",
   });
 }
+
+export async function pokeCert(): Promise<void> {
+  await apiRequest<unknown>(`${getApiBase()}/domain/cert`, { method: "POST" });
+}

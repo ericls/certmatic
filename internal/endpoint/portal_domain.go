@@ -118,6 +118,22 @@ type domainCheckResponse struct {
 	Overall  checkStatus   `json:"overall"`
 }
 
+func (e *portalDomainEndpoint) handlePokeCert() http.HandlerFunc {
+	return JSONHandler(http.StatusOK, func(r *http.Request, _ struct{}) (struct{}, error) {
+		session := sessionFromContext(r.Context())
+		if session == nil {
+			return struct{}{}, HTTPError{Status: http.StatusUnauthorized, Message: "session required"}
+		}
+		if e.certMan == nil {
+			return struct{}{}, HTTPError{Status: http.StatusServiceUnavailable, Message: "cert manager not available"}
+		}
+		if err := e.certMan.PokeCert(r.Context(), session.Hostname); err != nil {
+			return struct{}{}, err
+		}
+		return struct{}{}, nil
+	})
+}
+
 func (e *portalDomainEndpoint) handleDomainCheck() http.HandlerFunc {
 	return JSONHandler(http.StatusOK, func(r *http.Request, _ struct{}) (domainCheckResponse, error) {
 		session := sessionFromContext(r.Context())
