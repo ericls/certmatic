@@ -68,7 +68,8 @@ func (h *AdminHandler) Provision(ctx caddy.Context) error {
 	certMan := certman.NewCaddyCertMan(storage, tlsApp)
 	// HTTP handler
 	h.logger.Info("provisioning admin handler")
-	adminRouter := endpoint.MakeAdminRouter(h.app.domainRepo, h.app.dnsRecordManager, certMan, h.logger, h.app.sessionStore, h.app.signingKeyBytes, h.app.PortalBaseURL)
+	adminRouter := endpoint.MakeAdminRouter(h.app.domainRepo, h.app.dnsRecordManager, certMan,
+		h.logger, h.app.sessionStore, h.app.signingKeyBytes, h.app.PortalBaseURL)
 	h.router = chi.NewRouter()
 	h.router.Mount("/", adminRouter)
 	return nil

@@ -116,7 +116,8 @@ func TestMemorySessionStore_RedeemToken_Success(t *testing.T) {
 	defer store.Destruct()
 
 	key := []byte("signing-key")
-	token, _, err := CreateToken(store, key, "example.com", time.Hour, "", "", OwnershipVerificationModeDNSChallenge, "", "")
+	token, _, err := CreateToken(store, key, "example.com", time.Hour, "", "",
+		OwnershipVerificationModeDNSChallenge, "", "")
 	if err != nil {
 		t.Fatalf("CreateToken failed: %v", err)
 	}
@@ -135,7 +136,8 @@ func TestMemorySessionStore_RedeemToken_Replay(t *testing.T) {
 	defer store.Destruct()
 
 	key := []byte("signing-key")
-	token, _, _ := CreateToken(store, key, "example.com", time.Hour, "", "", OwnershipVerificationModeDNSChallenge, "", "")
+	token, _, _ := CreateToken(store, key, "example.com", time.Hour, "", "",
+		OwnershipVerificationModeDNSChallenge, "", "")
 
 	store.RedeemToken(key, token) // first use
 	_, err := store.RedeemToken(key, token)
@@ -149,7 +151,8 @@ func TestMemorySessionStore_RedeemToken_Expired(t *testing.T) {
 	defer store.Destruct()
 
 	key := []byte("signing-key")
-	token, _, _ := CreateToken(store, key, "example.com", -time.Second, "", "", OwnershipVerificationModeDNSChallenge, "", "")
+	token, _, _ := CreateToken(store, key, "example.com", -time.Second, "", "",
+		OwnershipVerificationModeDNSChallenge, "", "")
 
 	_, err := store.RedeemToken(key, token)
 	if err != ErrExpiredToken {

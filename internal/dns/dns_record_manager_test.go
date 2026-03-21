@@ -8,11 +8,11 @@ import (
 // mockLookup is a test double for Lookup. Each field is optional;
 // unset methods return a no-such-host DNS error by default.
 type mockLookup struct {
-	lookupNSFn   func(name string) ([]*net.NS, error)
-	lookupIPFn   func(name string) ([]net.IP, error)
+	lookupNSFn    func(name string) ([]*net.NS, error)
+	lookupIPFn    func(name string) ([]net.IP, error)
 	lookupCNAMEFn func(name string) (string, error)
-	lookupHostFn func(name string) ([]string, error)
-	lookupTXTFn  func(name string) ([]string, error)
+	lookupHostFn  func(name string) ([]string, error)
+	lookupTXTFn   func(name string) ([]string, error)
 }
 
 func (m *mockLookup) LookupNS(name string) ([]*net.NS, error) {
@@ -132,7 +132,8 @@ func TestGetRequiredDNSRecords_HTTP01_Subdomain(t *testing.T) {
 }
 
 func TestGetRequiredDNSRecords_DNS01_Subdomain(t *testing.T) {
-	m := NewDNSRecordManager(ChallengeTypeDNS01, "acme-delegate.saas.example.com", "proxy.saas.example.com", &mockLookup{})
+	m := NewDNSRecordManager(ChallengeTypeDNS01, "acme-delegate.saas.example.com",
+		"proxy.saas.example.com", &mockLookup{})
 	records := m.GetRequiredDNSRecords("sub.tenant.com")
 
 	if len(records) != 2 {

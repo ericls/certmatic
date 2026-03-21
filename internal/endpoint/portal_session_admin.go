@@ -56,7 +56,9 @@ func (e *portalSessionAdminEndpoint) handleCreateSession() http.HandlerFunc {
 			return createPortalSessionResponse{}, err
 		}
 
-		token, expiresAt, err := portal.CreateToken(e.sessionStore, e.signingKey, body.Hostname, 60*time.Minute, body.BackURL, body.BackText, body.OwnershipVerificationMode, body.VerifyOwnershipURL, body.VerifyOwnershipText)
+		token, expiresAt, err := portal.CreateToken(e.sessionStore, e.signingKey,
+			body.Hostname, 60*time.Minute, body.BackURL, body.BackText,
+			body.OwnershipVerificationMode, body.VerifyOwnershipURL, body.VerifyOwnershipText)
 		if err != nil {
 			return createPortalSessionResponse{}, err
 		}

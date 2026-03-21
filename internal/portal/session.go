@@ -58,7 +58,10 @@ type SessionStore interface {
 }
 
 // CreateToken stores a new session and returns an HMAC-signed token containing only the session ID.
-func CreateToken(store SessionStore, signingKey []byte, hostname string, ttl time.Duration, backURL, backText string, ownershipMode OwnershipVerificationMode, verifyOwnershipURL, verifyOwnershipText string) (string, time.Time, error) {
+func CreateToken(store SessionStore, signingKey []byte, hostname string, ttl time.Duration,
+	backURL, backText string, ownershipMode OwnershipVerificationMode,
+	verifyOwnershipURL, verifyOwnershipText string,
+) (string, time.Time, error) {
 	sessionID, err := uuid.NewRandom()
 	if err != nil {
 		return "", time.Time{}, fmt.Errorf("generate session id: %w", err)

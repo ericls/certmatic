@@ -107,7 +107,9 @@ func TestOverallStatus(t *testing.T) {
 		{"all ok", []domainCheck{{Status: checkStatusOK}, {Status: checkStatusOK}}, checkStatusOK},
 		{"has fail", []domainCheck{{Status: checkStatusOK}, {Status: checkStatusFail}}, checkStatusFail},
 		{"pending only", []domainCheck{{Status: checkStatusOK}, {Status: checkStatusPending}}, checkStatusPending},
-		{"fail beats pending", []domainCheck{{Status: checkStatusFail}, {Status: checkStatusPending}}, checkStatusFail},
+		{"fail beats pending", []domainCheck{{Status: checkStatusFail}, {
+			Status: checkStatusPending,
+		}}, checkStatusFail},
 		{"empty", []domainCheck{}, checkStatusOK},
 	}
 	for _, tc := range tests {
@@ -576,7 +578,9 @@ func TestCheckCNAME_LookupError(t *testing.T) {
 
 func TestCheckARecord_Match(t *testing.T) {
 	r := &mockLookup{
-		lookupHostFn: func(_ string) ([]string, error) { return []string{"1.2.3.4", "5.6.7.8"}, nil },
+		lookupHostFn: func(_ string) ([]string, error) {
+			return []string{"1.2.3.4", "5.6.7.8"}, nil
+		},
 	}
 	c := checkARecord(r, "sub.tenant.com", "1.2.3.4")
 	if c.Status != checkStatusOK {
@@ -607,7 +611,9 @@ func TestCheckARecord_LookupError(t *testing.T) {
 
 func TestCheckTXTRecord_Match(t *testing.T) {
 	r := &mockLookup{
-		lookupTXTFn: func(_ string) ([]string, error) { return []string{"wrong-value", "expected-value"}, nil },
+		lookupTXTFn: func(_ string) ([]string, error) {
+			return []string{"wrong-value", "expected-value"}, nil
+		},
 	}
 	c := checkTXTRecord(r, "_acme-challenge.sub.tenant.com", "expected-value")
 	if c.Status != checkStatusOK {

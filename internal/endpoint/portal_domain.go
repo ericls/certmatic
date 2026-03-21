@@ -60,7 +60,10 @@ func (e *portalDomainEndpoint) handleGetDomain() http.HandlerFunc {
 		var cert *certInfoResponse
 		if e.certMan != nil {
 			if info, _ := e.certMan.GetCertInfo(r.Context(), session.Hostname); info != nil {
-				cert = &certInfoResponse{NotBefore: info.NotBefore, NotAfter: info.NotAfter, Issuer: info.Issuer}
+				cert = &certInfoResponse{
+					NotBefore: info.NotBefore,
+					NotAfter:  info.NotAfter, Issuer: info.Issuer,
+				}
 			}
 		}
 
@@ -132,33 +135,49 @@ func (e *portalDomainEndpoint) handleEnsureCert() http.HandlerFunc {
 	return JSONHandler(http.StatusOK, func(r *http.Request, _ struct{}) (portalEnsureCertResponse, error) {
 		session := sessionFromContext(r.Context())
 		if session == nil {
-			return portalEnsureCertResponse{}, HTTPError{Status: http.StatusUnauthorized, Message: "session required"}
+			return portalEnsureCertResponse{}, HTTPError{
+				Status: http.StatusUnauthorized, Message: "session required",
+			}
 		}
 		if e.certMan == nil {
-			return portalEnsureCertResponse{}, HTTPError{Status: http.StatusServiceUnavailable, Message: "cert manager not available"}
+			return portalEnsureCertResponse{}, HTTPError{
+				Status: http.StatusServiceUnavailable, Message: "cert manager not available",
+			}
 		}
 		hostname := session.Hostname
 		if err := e.certMan.PokeCert(r.Context(), hostname); err != nil {
-			return portalEnsureCertResponse{}, HTTPError{Status: http.StatusInternalServerError, Message: fmt.Sprintf("error requesting certificate: %v", err)}
+			return portalEnsureCertResponse{}, HTTPError{
+				Status: http.StatusInternalServerError, Message: fmt.Sprintf(
+					"error requesting certificate: %v", err),
+			}
 		}
 		timeout := time.After(e.certWaitTimeout)
 		waitDuration := e.certPollInterval
 		for {
 			certInfo, err := e.certMan.GetCertInfo(r.Context(), hostname)
 			if err != nil {
-				return portalEnsureCertResponse{}, HTTPError{Status: http.StatusInternalServerError, Message: fmt.Sprintf("error checking certificate: %v", err)}
+				return portalEnsureCertResponse{}, HTTPError{
+					Status: http.StatusInternalServerError, Message: fmt.Sprintf("error checking certificate: %v", err),
+				}
 			}
 			if certInfo != nil && certInfo.NotAfter.After(time.Now()) && certInfo.NotBefore.Before(time.Now()) {
 				return portalEnsureCertResponse{
-					Hostname:         certInfo.Hostname,
-					certInfoResponse: certInfoResponse{NotBefore: certInfo.NotBefore, NotAfter: certInfo.NotAfter, Issuer: certInfo.Issuer},
+					Hostname: certInfo.Hostname,
+					certInfoResponse: certInfoResponse{
+						NotBefore: certInfo.NotBefore,
+						NotAfter:  certInfo.NotAfter, Issuer: certInfo.Issuer,
+					},
 				}, nil
 			}
 			select {
 			case <-timeout:
-				return portalEnsureCertResponse{}, HTTPError{Status: http.StatusGatewayTimeout, Message: "timed out waiting for certificate to be issued"}
+				return portalEnsureCertResponse{}, HTTPError{
+					Status: http.StatusGatewayTimeout, Message: "timed out waiting for certificate to be issued",
+				}
 			case <-r.Context().Done():
-				return portalEnsureCertResponse{}, HTTPError{Status: http.StatusServiceUnavailable, Message: "request cancelled"}
+				return portalEnsureCertResponse{}, HTTPError{
+					Status: http.StatusServiceUnavailable, Message: "request cancelled",
+				}
 			default:
 				time.Sleep(waitDuration)
 				if waitDuration < 10*time.Second {
@@ -208,7 +227,9 @@ func (e *portalDomainEndpoint) handleDomainCheck() http.HandlerFunc {
 			checks = append(checks, ownershipCheck)
 			if ownershipCheck.Status == checkStatusOK && !sd.Domain.OwnershipVerified {
 				verified := true
-				if err := e.domainRepo.Patch(r.Context(), hostname, domain.DomainPatch{OwnershipVerified: &verified}); err != nil {
+				if err := e.domainRepo.Patch(r.Context(), hostname, domain.DomainPatch{
+					OwnershipVerified: &verified,
+				}); err != nil {
 					return domainCheckResponse{}, err
 				}
 				sd.Domain.OwnershipVerified = true // update local copy for downstream checks in this response
@@ -222,7 +243,8 @@ func (e *portalDomainEndpoint) handleDomainCheck() http.HandlerFunc {
 				Status:  checkStatusOK,
 				Message: "Domain ownership is verified.",
 			})
-		} else if session.OwnershipVerificationMode == portal.OwnershipVerificationModeProviderManaged {
+		} else if session.OwnershipVerificationMode ==
+			portal.OwnershipVerificationModeProviderManaged {
 			checks = append(checks, domainCheck{
 				Name:    checkNameOwnershipVerified,
 				Status:  checkStatusFail,
