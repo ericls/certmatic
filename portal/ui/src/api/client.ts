@@ -81,5 +81,5 @@ export interface EnsuredCert extends CertInfo {
 }
 
 export async function ensureCert(): Promise<EnsuredCert> {
-  return apiRequest<IssuedCert>(`${getApiBase()}/domain/cert/ensure`, { method: "POST" });
+  return apiRequest<EnsuredCert>(`${getApiBase()}/domain/cert/ensure`, { method: "POST" });
 }
