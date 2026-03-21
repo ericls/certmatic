@@ -6,17 +6,85 @@ import { RequiredRecords } from "../components/RequiredRecords";
 import { CertStatusCard } from "../components/CertStatusCard";
 import { DoctorReport } from "../components/DoctorReport";
 import { StatusBadge } from "../components/StatusBadge";
-import type { DomainCheckReport, EnsuredCert } from "../api/client";
+import type { DNSRecord, DomainCheckReport, EnsuredCert } from "../api/client";
 
 interface Props {
   onBackButton: (back: { url: string; text: string } | null) => void;
 }
 
+function StepCard({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
+  return (
+    <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+      <div className="flex items-center gap-3 px-5 py-4 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <span className="flex-shrink-0 w-7 h-7 rounded-full bg-blue-600 text-white text-sm font-bold flex items-center justify-center">
+          {n}
+        </span>
+        <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">{title}</h2>
+      </div>
+      <div className="px-5 py-5 bg-white dark:bg-gray-900">{children}</div>
+    </div>
+  );
+}
+
+const OWNERSHIP_CHECK_NAMES = new Set(["ownership_txt_record", "ownership_verified"]);
+
+function formatZoneFile(records: DNSRecord[]): string {
+  return records.map((r) => `${r.name}  IN  ${r.type}  ${r.value}`).join("\n");
+}
+
+function RecordsExport({ records }: { records: DNSRecord[] }) {
+  const [copied, setCopied] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const zoneText = formatZoneFile(records);
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(zoneText);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="mt-4 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 dark:bg-gray-800">
+        <span className="text-xs font-medium text-gray-600 dark:text-gray-300 flex-1">
+          All records as zone file
+        </span>
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+        >
+          {expanded ? "Hide" : "Show"}
+        </button>
+        <button
+          onClick={handleCopy}
+          className="px-3 py-1 text-xs font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700"
+        >
+          {copied ? "Copied!" : "Copy all"}
+        </button>
+      </div>
+      {expanded && (
+        <pre className="px-4 py-3 text-xs font-mono text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 overflow-x-auto whitespace-pre">
+          {zoneText}
+        </pre>
+      )}
+    </div>
+  );
+}
+
 export function DomainSetup({ onBackButton }: Props) {
   const storeState = useDomain();
+
+  // Full setup check state
   const [checkReport, setCheckReport] = useState<DomainCheckReport | null>(null);
   const [checking, setChecking] = useState(false);
   const [checkError, setCheckError] = useState<string | null>(null);
+
+  // Ownership verification check state
+  const [verifyReport, setVerifyReport] = useState<DomainCheckReport | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+
+  // Certificate issuing state
   const [poking, setPoking] = useState(false);
   const [pokeError, setPokeError] = useState<string | null>(null);
   const [issuedCert, setIssuedCert] = useState<EnsuredCert | null>(null);
@@ -43,6 +111,22 @@ export function DomainSetup({ onBackButton }: Props) {
       setPokeError(e instanceof Error ? e.message : "Unknown error");
     } finally {
       setPoking(false);
+    }
+  };
+
+  const handleCheckVerification = async () => {
+    setVerifying(true);
+    setVerifyError(null);
+    try {
+      const report = await domainStore.runDomainCheck();
+      setVerifyReport({
+        ...report,
+        checks: report.checks.filter((c) => OWNERSHIP_CHECK_NAMES.has(c.name)),
+      });
+    } catch (e: unknown) {
+      setVerifyError(e instanceof Error ? e.message : "Unknown error");
+    } finally {
+      setVerifying(false);
     }
   };
 
@@ -75,97 +159,138 @@ export function DomainSetup({ onBackButton }: Props) {
 
   if (storeState.status !== "ready") {
     return (
-      <div className="p-6 text-gray-500 dark:text-gray-400 text-sm max-w-3xl mx-auto px-4 py-8 space-y-8">
+      <div className="p-6 text-gray-500 dark:text-gray-400 text-sm max-w-3xl mx-auto px-4 py-8">
         Loading…
       </div>
     );
   }
 
   const domain = storeState.domain;
+  const isDnsChallenge = domain.ownership_verification_mode === "dns_challenge";
+  const ownershipDone = domain.ownership_verified || domain.cert !== null;
+
+  // Records to include in bulk export: if dns_challenge, include ownership TXT too
+  const exportRecords: DNSRecord[] =
+    isDnsChallenge && domain.ownership_txt_record
+      ? [domain.ownership_txt_record, ...domain.required_dns_records]
+      : domain.required_dns_records;
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8 space-y-8">
-      {/* Header */}
+    <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
+      {/* Page header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{domain.hostname}</h1>
-        <div className="mt-1 flex items-center gap-2">
-          <span className="text-sm text-gray-500 dark:text-gray-400">Ownership:</span>
-          <StatusBadge
-            status={domain.ownership_verified || domain.cert !== null ? "ok" : "pending"}
-          />
-          {!domain.ownership_verified &&
-            domain.cert === null &&
-            domain.ownership_verification_mode === "provider_managed" &&
-            domain.verify_ownership_url && (
-              <a
-                href={sanitizeUrl(domain.verify_ownership_url)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-3 py-1 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                {domain.verify_ownership_text ?? "Verify Ownership"}
-              </a>
-            )}
-        </div>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          Follow the steps below to connect your domain.
+        </p>
       </div>
 
-      {/* DNS Records */}
-      <section>
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3">
-          Required DNS Records
-        </h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          Add the following records to your DNS provider to connect your domain.
-        </p>
-        <RequiredRecords records={domain.required_dns_records} />
-      </section>
-
-      {/* Ownership Verification Record (DNS challenge mode) */}
-      {domain.ownership_txt_record && (
-        <section>
-          <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3">
-            Ownership Verification Record
-          </h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            Add this TXT record to prove ownership.
-          </p>
-          <RequiredRecords records={[domain.ownership_txt_record]} />
-        </section>
-      )}
-
-      {/* Certificate Status */}
-      <section>
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3">
-          Certificate Status
-        </h2>
-        <CertStatusCard cert={domain.cert} ownershipVerified={domain.ownership_verified} />
-        {domain.ownership_verified && domain.cert === null && (
-          <div className="mt-3">
-            <button
-              onClick={handleEnsureCert}
-              disabled={poking}
-              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {poking ? "Issuing…" : "Issue Certificate"}
-            </button>
-            {pokeError && (
-              <p className="mt-2 text-sm text-red-600 dark:text-red-400">{pokeError}</p>
-            )}
-            {issuedCert && (
-              <p className="mt-2 text-sm text-green-600 dark:text-green-400">
-                Certificate issued. Valid until{" "}
-                {new Date(issuedCert.not_after).toLocaleDateString()}.
-              </p>
-            )}
+      {/* Step 1: Verify Ownership */}
+      <StepCard n={1} title="Verify Ownership">
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600 dark:text-gray-400">Status:</span>
+            <StatusBadge status={ownershipDone ? "ok" : "pending"} />
           </div>
-        )}
-      </section>
 
-      {/* Setup Doctor */}
-      <section>
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3">Setup Check</h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          Run a live check to verify your DNS records are correctly configured.
+          {!ownershipDone && (
+            <>
+              {isDnsChallenge && domain.ownership_txt_record ? (
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                    Add this TXT record to your DNS provider to prove ownership of this domain.
+                  </p>
+                  <RequiredRecords records={[domain.ownership_txt_record]} />
+                </div>
+              ) : domain.verify_ownership_url ? (
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                    Verify ownership of this domain through your provider dashboard.
+                  </p>
+                  <a
+                    href={sanitizeUrl(domain.verify_ownership_url)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  >
+                    {domain.verify_ownership_text ?? "Verify Ownership"}
+                  </a>
+                </div>
+              ) : null}
+
+              <div>
+                <button
+                  onClick={handleCheckVerification}
+                  disabled={verifying}
+                  className="px-4 py-2 text-sm font-medium border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {verifying ? "Checking…" : "Check Verification"}
+                </button>
+                {verifyError && (
+                  <p className="mt-2 text-sm text-red-600 dark:text-red-400">{verifyError}</p>
+                )}
+                {verifyReport && (
+                  <div className="mt-3">
+                    <DoctorReport report={verifyReport} />
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </StepCard>
+
+      {/* Step 2: Configure DNS Records */}
+      <StepCard n={2} title="Configure DNS Records">
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Add the following records to your DNS provider to point your domain.
+          </p>
+
+          {domain.required_dns_records.length > 0 ? (
+            <RequiredRecords records={domain.required_dns_records} />
+          ) : (
+            <p className="text-sm text-gray-500 dark:text-gray-400">No DNS records required.</p>
+          )}
+
+          {exportRecords.length > 0 && <RecordsExport records={exportRecords} />}
+        </div>
+      </StepCard>
+
+      {/* Step 3: Certificate */}
+      <StepCard n={3} title="Certificate">
+        <div className="space-y-3">
+          <CertStatusCard cert={domain.cert} ownershipVerified={domain.ownership_verified} />
+          {domain.ownership_verified && domain.cert === null && (
+            <div>
+              <button
+                onClick={handleEnsureCert}
+                disabled={poking}
+                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {poking ? "Issuing…" : "Issue Certificate"}
+              </button>
+              {pokeError && (
+                <p className="mt-2 text-sm text-red-600 dark:text-red-400">{pokeError}</p>
+              )}
+              {issuedCert && (
+                <p className="mt-2 text-sm text-green-600 dark:text-green-400">
+                  Certificate issued. Valid until{" "}
+                  {new Date(issuedCert.not_after).toLocaleDateString()}.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      </StepCard>
+
+      {/* Setup Check */}
+      <section className="pt-2">
+        <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
+          Setup Check
+        </h2>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+          Run a live check to verify all DNS records and certificate status.
         </p>
         <button
           onClick={handleRunCheck}
