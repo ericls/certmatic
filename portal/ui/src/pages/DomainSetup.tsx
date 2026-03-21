@@ -150,7 +150,12 @@ export function DomainSetup({ onBackButton }: Props) {
           </div>
         </StepCard>
 
-        <SetupCheck certIsNull={domain.cert === null} onEnsureCert={handleEnsureCert} />
+        <SetupCheck
+          // Invalidates the setup check state when cert changes
+          key={issuedCert?.not_after ?? "no-cert"}
+          certIsNull={domain.cert === null}
+          onEnsureCert={handleEnsureCert}
+        />
       </div>
     </>
   );
