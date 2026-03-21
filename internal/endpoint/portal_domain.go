@@ -83,9 +83,6 @@ func (e *portalDomainEndpoint) handleGetDomain() http.HandlerFunc {
 		case portal.OwnershipVerificationModeProviderManaged:
 			resp.VerifyOwnershipURL = session.VerifyOwnershipURL
 			resp.VerifyOwnershipText = session.VerifyOwnershipText
-			if resp.VerifyOwnershipText == "" {
-				resp.VerifyOwnershipText = "Verify Ownership"
-			}
 		}
 		return resp, nil
 	})
