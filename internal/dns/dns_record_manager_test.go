@@ -1,6 +1,54 @@
 package dns
 
-import "testing"
+import (
+	"net"
+	"testing"
+)
+
+// mockLookup is a test double for Lookup. Each field is optional;
+// unset methods return a no-such-host DNS error by default.
+type mockLookup struct {
+	lookupNSFn   func(name string) ([]*net.NS, error)
+	lookupIPFn   func(name string) ([]net.IP, error)
+	lookupCNAMEFn func(name string) (string, error)
+	lookupHostFn func(name string) ([]string, error)
+	lookupTXTFn  func(name string) ([]string, error)
+}
+
+func (m *mockLookup) LookupNS(name string) ([]*net.NS, error) {
+	if m.lookupNSFn != nil {
+		return m.lookupNSFn(name)
+	}
+	return nil, &net.DNSError{Name: name, Err: "no such host"}
+}
+
+func (m *mockLookup) LookupIP(name string) ([]net.IP, error) {
+	if m.lookupIPFn != nil {
+		return m.lookupIPFn(name)
+	}
+	return nil, &net.DNSError{Name: name, Err: "no such host"}
+}
+
+func (m *mockLookup) LookupCNAME(name string) (string, error) {
+	if m.lookupCNAMEFn != nil {
+		return m.lookupCNAMEFn(name)
+	}
+	return "", &net.DNSError{Name: name, Err: "no such host"}
+}
+
+func (m *mockLookup) LookupHost(name string) ([]string, error) {
+	if m.lookupHostFn != nil {
+		return m.lookupHostFn(name)
+	}
+	return nil, &net.DNSError{Name: name, Err: "no such host"}
+}
+
+func (m *mockLookup) LookupTXT(name string) ([]string, error) {
+	if m.lookupTXTFn != nil {
+		return m.lookupTXTFn(name)
+	}
+	return nil, &net.DNSError{Name: name, Err: "no such host"}
+}
 
 // --- isETLDPlusOne ---
 
@@ -65,7 +113,7 @@ func TestDetectProviderFromNS(t *testing.T) {
 // --- GetRequiredDNSRecords (subdomain paths only — no live DNS) ---
 
 func TestGetRequiredDNSRecords_HTTP01_Subdomain(t *testing.T) {
-	m := NewDNSRecordManager(ChallengeTypeHTTP01, "", "proxy.saas.example.com")
+	m := NewDNSRecordManager(ChallengeTypeHTTP01, "", "proxy.saas.example.com", &mockLookup{})
 	records := m.GetRequiredDNSRecords("sub.tenant.com")
 
 	if len(records) != 1 {
@@ -84,7 +132,7 @@ func TestGetRequiredDNSRecords_HTTP01_Subdomain(t *testing.T) {
 }
 
 func TestGetRequiredDNSRecords_DNS01_Subdomain(t *testing.T) {
-	m := NewDNSRecordManager(ChallengeTypeDNS01, "acme-delegate.saas.example.com", "proxy.saas.example.com")
+	m := NewDNSRecordManager(ChallengeTypeDNS01, "acme-delegate.saas.example.com", "proxy.saas.example.com", &mockLookup{})
 	records := m.GetRequiredDNSRecords("sub.tenant.com")
 
 	if len(records) != 2 {
@@ -112,7 +160,7 @@ func TestGetRequiredDNSRecords_DNS01_Subdomain(t *testing.T) {
 }
 
 func TestGetRequiredDNSRecords_DeepSubdomain(t *testing.T) {
-	m := NewDNSRecordManager(ChallengeTypeHTTP01, "", "ingress.saas.example.com")
+	m := NewDNSRecordManager(ChallengeTypeHTTP01, "", "ingress.saas.example.com", &mockLookup{})
 	records := m.GetRequiredDNSRecords("a.b.tenant.com")
 
 	if len(records) != 1 {
@@ -123,5 +171,65 @@ func TestGetRequiredDNSRecords_DeepSubdomain(t *testing.T) {
 	}
 	if records[0].Value != "ingress.saas.example.com" {
 		t.Errorf("unexpected value %q", records[0].Value)
+	}
+}
+
+// --- GetRequiredDNSRecords — apex-domain paths (previously required live DNS) ---
+
+// cloudflareNS returns an NS record that matches the Cloudflare provider pattern.
+func cloudflareNS() []*net.NS {
+	return []*net.NS{{Host: "ns1.ns.cloudflare.com."}}
+}
+
+func TestGetRequiredDNSRecords_ApexDomain_KnownFlatteningProvider_ReturnsCNAME(t *testing.T) {
+	l := &mockLookup{
+		lookupNSFn: func(_ string) ([]*net.NS, error) { return cloudflareNS(), nil },
+	}
+	m := NewDNSRecordManager(ChallengeTypeHTTP01, "", "proxy.saas.internal", l)
+	records := m.GetRequiredDNSRecords("tenant.com") // apex domain
+
+	if len(records) != 1 {
+		t.Fatalf("expected 1 record, got %d", len(records))
+	}
+	if records[0].Type != "CNAME" {
+		t.Errorf("expected CNAME for Cloudflare apex, got %s", records[0].Type)
+	}
+	if records[0].Value != "proxy.saas.internal" {
+		t.Errorf("unexpected CNAME value %q", records[0].Value)
+	}
+}
+
+func TestGetRequiredDNSRecords_ApexDomain_UnknownProvider_ReturnsARecord(t *testing.T) {
+	l := &mockLookup{
+		lookupNSFn: func(_ string) ([]*net.NS, error) {
+			return []*net.NS{{Host: "ns1.unknown-provider.net."}}, nil
+		},
+		// nameToIP resolves the cNameTarget to an IP
+		lookupIPFn: func(_ string) ([]net.IP, error) {
+			return []net.IP{net.ParseIP("1.2.3.4")}, nil
+		},
+	}
+	m := NewDNSRecordManager(ChallengeTypeHTTP01, "", "proxy.saas.internal", l)
+	records := m.GetRequiredDNSRecords("tenant.com")
+
+	if len(records) != 1 {
+		t.Fatalf("expected 1 record, got %d", len(records))
+	}
+	if records[0].Type != "A" {
+		t.Errorf("expected A record for unknown-provider apex, got %s", records[0].Type)
+	}
+	if records[0].Value != "1.2.3.4" {
+		t.Errorf("unexpected A record value %q", records[0].Value)
+	}
+}
+
+func TestGetRequiredDNSRecords_ApexDomain_NSLookupFails_ReturnsEmpty(t *testing.T) {
+	// mockLookup returns DNS errors by default, so no NS records found.
+	m := NewDNSRecordManager(ChallengeTypeHTTP01, "", "proxy.saas.internal", &mockLookup{})
+	records := m.GetRequiredDNSRecords("tenant.com")
+
+	// nameToIP also fails (no lookupIPFn), so getPointingRecord errors → empty slice.
+	if len(records) != 0 {
+		t.Errorf("expected empty records when NS lookup fails, got %d", len(records))
 	}
 }

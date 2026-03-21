@@ -18,13 +18,15 @@ type DNSRecordManager struct {
 	// then we will ask user to create a CNAME record for "_acme-challenge.shop.foo.com" pointing to "acme_delegation.saas.com".
 	dnsDelegationDomain string
 	cNameTarget         string
+	lookup              Lookup
 }
 
-func NewDNSRecordManager(challengeType ChallengeType, dnsDelegationDomain, cNameTarget string) *DNSRecordManager {
+func NewDNSRecordManager(challengeType ChallengeType, dnsDelegationDomain, cNameTarget string, lookup Lookup) *DNSRecordManager {
 	return &DNSRecordManager{
 		challengeType:       challengeType,
 		dnsDelegationDomain: dnsDelegationDomain,
 		cNameTarget:         cNameTarget,
+		lookup:              lookup,
 	}
 }
 
@@ -46,7 +48,7 @@ func (m *DNSRecordManager) GetRequiredDNSRecords(hostname string) []domain.DNSRe
 }
 
 func (m *DNSRecordManager) supportCNameFlattening(hostname string) bool {
-	provider := getDNSProvider(hostname)
+	provider := getDNSProvider(hostname, m.lookup)
 	return providerSupportsCNAMEFlattening[provider]
 }
 
@@ -65,7 +67,7 @@ func (m *DNSRecordManager) getPointingRecord(hostname string) (domain.DNSRecord,
 			Value: m.cNameTarget,
 		}, nil
 	}
-	ip, err := nameToIP(m.cNameTarget)
+	ip, err := nameToIP(m.cNameTarget, m.lookup)
 	if err != nil {
 		return domain.DNSRecord{}, err
 	}

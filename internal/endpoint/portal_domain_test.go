@@ -24,44 +24,61 @@ func withSession(r *http.Request, session *portal.Session) *http.Request {
 
 // newPortalTestEndpoint creates a portalDomainEndpoint wired for testing.
 // certPollInterval=0 and a short timeout make polling tests fast.
-// Uses netResolver (real DNS) — use newPortalTestEndpointWithResolver for DNS-controlled tests.
+// Uses a mock DNS lookup (returns errors) — safe for tests that don't need real DNS.
 func newPortalTestEndpoint(repo domain.DomainRepo, cm certman.CertMan) *portalDomainEndpoint {
-	return newPortalTestEndpointWithResolver(repo, cm, netResolver{})
+	return newPortalTestEndpointWithLookup(repo, cm, &mockLookup{})
 }
 
-func newPortalTestEndpointWithResolver(repo domain.DomainRepo, cm certman.CertMan, r Resolver) *portalDomainEndpoint {
+func newPortalTestEndpointWithLookup(repo domain.DomainRepo, cm certman.CertMan, l dns.Lookup) *portalDomainEndpoint {
 	return &portalDomainEndpoint{
 		domainRepo:       repo,
-		dnsRecordManager: dns.NewDNSRecordManager(dns.ChallengeTypeHTTP01, "", "proxy.saas.internal"),
+		dnsRecordManager: dns.NewDNSRecordManager(dns.ChallengeTypeHTTP01, "", "proxy.saas.internal", l),
 		certMan:          cm,
 		certWaitTimeout:  20 * time.Millisecond,
 		certPollInterval: 0,
-		resolver:         r,
+		lookup:           l,
 	}
 }
 
-// mockResolver lets tests control DNS lookup results.
-type mockResolver struct {
+// mockLookup lets tests control DNS lookup results.
+// Unset methods return a no-such-host DNS error by default.
+type mockLookup struct {
+	lookupNSFn    func(name string) ([]*net.NS, error)
+	lookupIPFn    func(name string) ([]net.IP, error)
 	lookupCNAMEFn func(name string) (string, error)
 	lookupHostFn  func(name string) ([]string, error)
 	lookupTXTFn   func(name string) ([]string, error)
 }
 
-func (m *mockResolver) LookupCNAME(name string) (string, error) {
+func (m *mockLookup) LookupNS(name string) ([]*net.NS, error) {
+	if m.lookupNSFn != nil {
+		return m.lookupNSFn(name)
+	}
+	return nil, &net.DNSError{Name: name, Err: "no such host"}
+}
+
+func (m *mockLookup) LookupIP(name string) ([]net.IP, error) {
+	if m.lookupIPFn != nil {
+		return m.lookupIPFn(name)
+	}
+	return nil, &net.DNSError{Name: name, Err: "no such host"}
+}
+
+func (m *mockLookup) LookupCNAME(name string) (string, error) {
 	if m.lookupCNAMEFn != nil {
 		return m.lookupCNAMEFn(name)
 	}
 	return "", &net.DNSError{Name: name, Err: "no such host"}
 }
 
-func (m *mockResolver) LookupHost(name string) ([]string, error) {
+func (m *mockLookup) LookupHost(name string) ([]string, error) {
 	if m.lookupHostFn != nil {
 		return m.lookupHostFn(name)
 	}
 	return nil, &net.DNSError{Name: name, Err: "no such host"}
 }
 
-func (m *mockResolver) LookupTXT(name string) ([]string, error) {
+func (m *mockLookup) LookupTXT(name string) ([]string, error) {
 	if m.lookupTXTFn != nil {
 		return m.lookupTXTFn(name)
 	}
@@ -376,7 +393,7 @@ func TestPortalDomainCheck_OwnershipAlreadyVerified(t *testing.T) {
 	cm := &mockCertMan{
 		hasCertFn: func(_ context.Context, _ string) (bool, error) { return false, nil },
 	}
-	e := newPortalTestEndpoint(repo, cm)
+	e := newPortalTestEndpointWithLookup(repo, cm, &mockLookup{})
 
 	req := withSession(httptest.NewRequest(http.MethodPost, "/", nil), portalSession("sub.tenant.com"))
 	rec := httptest.NewRecorder()
@@ -408,7 +425,7 @@ func TestPortalDomainCheck_ProviderManaged_NotVerified(t *testing.T) {
 	cm := &mockCertMan{
 		hasCertFn: func(_ context.Context, _ string) (bool, error) { return false, nil },
 	}
-	e := newPortalTestEndpoint(repo, cm)
+	e := newPortalTestEndpointWithLookup(repo, cm, &mockLookup{})
 
 	req := withSession(httptest.NewRequest(http.MethodPost, "/", nil), portalSession("sub.tenant.com"))
 	rec := httptest.NewRecorder()
@@ -440,7 +457,7 @@ func TestPortalDomainCheck_CertPresent(t *testing.T) {
 	cm := &mockCertMan{
 		hasCertFn: func(_ context.Context, _ string) (bool, error) { return true, nil },
 	}
-	e := newPortalTestEndpoint(repo, cm)
+	e := newPortalTestEndpointWithLookup(repo, cm, &mockLookup{})
 
 	req := withSession(httptest.NewRequest(http.MethodPost, "/", nil), portalSession("sub.tenant.com"))
 	rec := httptest.NewRecorder()
@@ -469,7 +486,7 @@ func TestPortalDomainCheck_CertPending_OwnershipNotVerified(t *testing.T) {
 	cm := &mockCertMan{
 		hasCertFn: func(_ context.Context, _ string) (bool, error) { return false, nil },
 	}
-	e := newPortalTestEndpoint(repo, cm)
+	e := newPortalTestEndpointWithLookup(repo, cm, &mockLookup{})
 
 	req := withSession(httptest.NewRequest(http.MethodPost, "/", nil), portalSession("sub.tenant.com"))
 	rec := httptest.NewRecorder()
@@ -501,7 +518,7 @@ func TestPortalDomainCheck_CertPending_OwnershipVerified(t *testing.T) {
 	cm := &mockCertMan{
 		hasCertFn: func(_ context.Context, _ string) (bool, error) { return false, nil },
 	}
-	e := newPortalTestEndpoint(repo, cm)
+	e := newPortalTestEndpointWithLookup(repo, cm, &mockLookup{})
 
 	req := withSession(httptest.NewRequest(http.MethodPost, "/", nil), portalSession("sub.tenant.com"))
 	rec := httptest.NewRecorder()
@@ -527,7 +544,7 @@ func TestPortalDomainCheck_CertPending_OwnershipVerified(t *testing.T) {
 // --- checkCNAME / checkARecord / checkTXTRecord / checkOwnershipTXTRecord ---
 
 func TestCheckCNAME_Match(t *testing.T) {
-	r := &mockResolver{
+	r := &mockLookup{
 		lookupCNAMEFn: func(_ string) (string, error) { return "proxy.saas.internal.", nil },
 	}
 	c := checkCNAME(r, "sub.tenant.com", "proxy.saas.internal")
@@ -537,7 +554,7 @@ func TestCheckCNAME_Match(t *testing.T) {
 }
 
 func TestCheckCNAME_WrongDestination(t *testing.T) {
-	r := &mockResolver{
+	r := &mockLookup{
 		lookupCNAMEFn: func(_ string) (string, error) { return "other.host.", nil },
 	}
 	c := checkCNAME(r, "sub.tenant.com", "proxy.saas.internal")
@@ -550,7 +567,7 @@ func TestCheckCNAME_WrongDestination(t *testing.T) {
 }
 
 func TestCheckCNAME_LookupError(t *testing.T) {
-	r := &mockResolver{}
+	r := &mockLookup{}
 	c := checkCNAME(r, "sub.tenant.com", "proxy.saas.internal")
 	if c.Status != checkStatusFail {
 		t.Errorf("expected fail, got %q", c.Status)
@@ -558,7 +575,7 @@ func TestCheckCNAME_LookupError(t *testing.T) {
 }
 
 func TestCheckARecord_Match(t *testing.T) {
-	r := &mockResolver{
+	r := &mockLookup{
 		lookupHostFn: func(_ string) ([]string, error) { return []string{"1.2.3.4", "5.6.7.8"}, nil },
 	}
 	c := checkARecord(r, "sub.tenant.com", "1.2.3.4")
@@ -568,7 +585,7 @@ func TestCheckARecord_Match(t *testing.T) {
 }
 
 func TestCheckARecord_WrongIP(t *testing.T) {
-	r := &mockResolver{
+	r := &mockLookup{
 		lookupHostFn: func(_ string) ([]string, error) { return []string{"9.9.9.9"}, nil },
 	}
 	c := checkARecord(r, "sub.tenant.com", "1.2.3.4")
@@ -581,7 +598,7 @@ func TestCheckARecord_WrongIP(t *testing.T) {
 }
 
 func TestCheckARecord_LookupError(t *testing.T) {
-	r := &mockResolver{}
+	r := &mockLookup{}
 	c := checkARecord(r, "sub.tenant.com", "1.2.3.4")
 	if c.Status != checkStatusFail {
 		t.Errorf("expected fail, got %q", c.Status)
@@ -589,7 +606,7 @@ func TestCheckARecord_LookupError(t *testing.T) {
 }
 
 func TestCheckTXTRecord_Match(t *testing.T) {
-	r := &mockResolver{
+	r := &mockLookup{
 		lookupTXTFn: func(_ string) ([]string, error) { return []string{"wrong-value", "expected-value"}, nil },
 	}
 	c := checkTXTRecord(r, "_acme-challenge.sub.tenant.com", "expected-value")
@@ -599,7 +616,7 @@ func TestCheckTXTRecord_Match(t *testing.T) {
 }
 
 func TestCheckTXTRecord_WrongValue(t *testing.T) {
-	r := &mockResolver{
+	r := &mockLookup{
 		lookupTXTFn: func(_ string) ([]string, error) { return []string{"other-value"}, nil },
 	}
 	c := checkTXTRecord(r, "_acme-challenge.sub.tenant.com", "expected-value")
@@ -612,7 +629,7 @@ func TestCheckTXTRecord_WrongValue(t *testing.T) {
 }
 
 func TestCheckOwnershipTXTRecord_Match(t *testing.T) {
-	r := &mockResolver{
+	r := &mockLookup{
 		lookupTXTFn: func(name string) ([]string, error) {
 			if name == "_certmatic-verify.sub.tenant.com" {
 				return []string{"my-token"}, nil
@@ -627,7 +644,7 @@ func TestCheckOwnershipTXTRecord_Match(t *testing.T) {
 }
 
 func TestCheckOwnershipTXTRecord_NoRecord(t *testing.T) {
-	r := &mockResolver{}
+	r := &mockLookup{}
 	c := checkOwnershipTXTRecord(r, "sub.tenant.com", "my-token")
 	if c.Status != checkStatusFail {
 		t.Errorf("expected fail, got %q", c.Status)
@@ -646,13 +663,13 @@ func TestPortalDomainCheck_DNSChallenge_AutoVerifiesOwnership(t *testing.T) {
 	cm := &mockCertMan{
 		hasCertFn: func(_ context.Context, _ string) (bool, error) { return false, nil },
 	}
-	r := &mockResolver{
+	r := &mockLookup{
 		// CNAME check on the hostname itself (the required DNS record)
 		lookupCNAMEFn: func(_ string) (string, error) { return "proxy.saas.internal.", nil },
 		// Ownership TXT record returns the correct token
 		lookupTXTFn: func(_ string) ([]string, error) { return []string{"secret-token"}, nil },
 	}
-	e := newPortalTestEndpointWithResolver(repo, cm, r)
+	e := newPortalTestEndpointWithLookup(repo, cm, r)
 
 	session := &portal.Session{
 		SessionID:                 "test-session",
@@ -707,11 +724,11 @@ func TestPortalDomainCheck_DNSChallenge_WrongToken_NoAutoVerify(t *testing.T) {
 	cm := &mockCertMan{
 		hasCertFn: func(_ context.Context, _ string) (bool, error) { return false, nil },
 	}
-	r := &mockResolver{
+	r := &mockLookup{
 		lookupCNAMEFn: func(_ string) (string, error) { return "proxy.saas.internal.", nil },
 		lookupTXTFn:   func(_ string) ([]string, error) { return []string{"wrong-token"}, nil },
 	}
-	e := newPortalTestEndpointWithResolver(repo, cm, r)
+	e := newPortalTestEndpointWithLookup(repo, cm, r)
 
 	session := &portal.Session{
 		SessionID:                 "test-session",

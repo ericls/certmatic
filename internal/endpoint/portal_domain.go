@@ -2,7 +2,6 @@ package endpoint
 
 import (
 	"fmt"
-	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -13,27 +12,13 @@ import (
 	"github.com/ericls/certmatic/pkg/domain"
 )
 
-// Resolver abstracts DNS lookups so they can be replaced in tests.
-type Resolver interface {
-	LookupCNAME(name string) (string, error)
-	LookupHost(name string) ([]string, error)
-	LookupTXT(name string) ([]string, error)
-}
-
-// netResolver is the production Resolver backed by the standard library.
-type netResolver struct{}
-
-func (netResolver) LookupCNAME(name string) (string, error)  { return net.LookupCNAME(name) }
-func (netResolver) LookupHost(name string) ([]string, error) { return net.LookupHost(name) }
-func (netResolver) LookupTXT(name string) ([]string, error)  { return net.LookupTXT(name) }
-
 type portalDomainEndpoint struct {
 	domainRepo       domain.DomainRepo
 	dnsRecordManager *dns.DNSRecordManager
 	certMan          certman.CertMan
 	certWaitTimeout  time.Duration
 	certPollInterval time.Duration
-	resolver         Resolver
+	lookup           dns.Lookup
 }
 
 // --- GET /portal/api/domain ---
@@ -209,17 +194,17 @@ func (e *portalDomainEndpoint) handleDomainCheck() http.HandlerFunc {
 		for _, rec := range required {
 			switch rec.Type {
 			case "CNAME":
-				checks = append(checks, checkCNAME(e.resolver, rec.Name, rec.Value))
+				checks = append(checks, checkCNAME(e.lookup, rec.Name, rec.Value))
 			case "A":
-				checks = append(checks, checkARecord(e.resolver, rec.Name, rec.Value))
+				checks = append(checks, checkARecord(e.lookup, rec.Name, rec.Value))
 			case "TXT":
-				checks = append(checks, checkTXTRecord(e.resolver, rec.Name, rec.Value))
+				checks = append(checks, checkTXTRecord(e.lookup, rec.Name, rec.Value))
 			}
 		}
 
 		// DNS challenge ownership check.
 		if session.OwnershipVerificationMode == portal.OwnershipVerificationModeDNSChallenge {
-			ownershipCheck := checkOwnershipTXTRecord(e.resolver, hostname, sd.Domain.VerificationToken)
+			ownershipCheck := checkOwnershipTXTRecord(e.lookup, hostname, sd.Domain.VerificationToken)
 			checks = append(checks, ownershipCheck)
 			if ownershipCheck.Status == checkStatusOK && !sd.Domain.OwnershipVerified {
 				verified := true
@@ -285,7 +270,7 @@ func (e *portalDomainEndpoint) handleDomainCheck() http.HandlerFunc {
 	})
 }
 
-func checkCNAME(r Resolver, name, expected string) domainCheck {
+func checkCNAME(r dns.Lookup, name, expected string) domainCheck {
 	cname, err := r.LookupCNAME(name)
 	if err != nil {
 		return domainCheck{
@@ -314,7 +299,7 @@ func checkCNAME(r Resolver, name, expected string) domainCheck {
 	}
 }
 
-func checkARecord(r Resolver, name, expected string) domainCheck {
+func checkARecord(r dns.Lookup, name, expected string) domainCheck {
 	addrs, err := r.LookupHost(name)
 	if err != nil {
 		return domainCheck{
@@ -348,7 +333,7 @@ func checkARecord(r Resolver, name, expected string) domainCheck {
 	}
 }
 
-func checkTXTRecord(r Resolver, name, expected string) domainCheck {
+func checkTXTRecord(r dns.Lookup, name, expected string) domainCheck {
 	txts, err := r.LookupTXT(name)
 	if err != nil {
 		return domainCheck{
@@ -382,7 +367,7 @@ func checkTXTRecord(r Resolver, name, expected string) domainCheck {
 	}
 }
 
-func checkOwnershipTXTRecord(r Resolver, hostname, token string) domainCheck {
+func checkOwnershipTXTRecord(r dns.Lookup, hostname, token string) domainCheck {
 	name := "_certmatic-verify." + hostname
 	txts, err := r.LookupTXT(name)
 	if err != nil {

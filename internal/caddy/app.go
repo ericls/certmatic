@@ -78,7 +78,7 @@ func (a *App) Provision(ctx caddy.Context) error {
 	}
 	a.domainRepo = domainRepo.(domain.DomainRepo)
 
-	dnsRecordManager := dns.NewDNSRecordManager(a.ChallengeType, a.DNSDelegationDomain, a.CNameTarget)
+	dnsRecordManager := dns.NewDNSRecordManager(a.ChallengeType, a.DNSDelegationDomain, a.CNameTarget, dns.NetLookup())
 	a.dnsRecordManager = dnsRecordManager
 
 	// Portal signing key
