@@ -8,6 +8,7 @@ import { RequiredRecords } from "../components/RequiredRecords";
 import { RecordsExport } from "../components/RecordsExport";
 import { ExportModal } from "../components/ExportModal";
 import { Button, StepCard } from "../ui";
+import { sanitizeUrl } from "../utils/sanitizeUrl";
 import type { DNSRecord, EnsuredCert } from "../api/client";
 
 interface Props {
@@ -93,9 +94,13 @@ export function DomainSetup({ onBackButton }: Props) {
 
         {showTopLevelExport && (
           <p className="text-s text-gray-500 dark:text-gray-400">
-            <span className="font-semibold">Tip:</span> both steps below require DNS changes.{" "}
-            <Button variant="ghost" onClick={() => setShowExportModal(true)}>
-              View all records at once
+            <span className="font-bold">Tip:</span> both steps below require DNS changes.{" "}
+            <Button
+              variant="ghost"
+              onClick={() => setShowExportModal(true)}
+              className="font-semibold"
+            >
+              View all records in importable format
             </Button>
           </p>
         )}
@@ -146,6 +151,14 @@ export function DomainSetup({ onBackButton }: Props) {
                   </p>
                 )}
               </div>
+            )}
+            {(domain.cert !== null || issuedCert !== null) && domain.back_url && (
+              <a
+                href={sanitizeUrl(domain.back_url)}
+                className="inline-flex items-center gap-1 px-4 py-2 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700"
+              >
+                {domain.back_text || "Back"}
+              </a>
             )}
           </div>
         </StepCard>
