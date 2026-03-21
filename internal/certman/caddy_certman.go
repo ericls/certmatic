@@ -68,11 +68,25 @@ func (c *CaddyCertMan) GetCertInfo(ctx context.Context, hostname string) (*CertI
 }
 
 func (c *CaddyCertMan) PokeCert(ctx context.Context, hostname string) error {
+	// NOTE: Known limitation — this is a no-op if the cert is already in certmagic's
+	// in-memory cache (managed=true), even if the .crt has been deleted from storage.
+	// certmagic.Config.manageOne() short-circuits on a cache hit before checking storage.
+	// See the DeleteCert comment below for the full picture and the fix path.
 	return c.tlsApp.Manage(map[string]struct{}{hostname: {}})
 }
 
 func (c *CaddyCertMan) DeleteCert(ctx context.Context, hostname string) error {
-	// Similar to GetCertInfo, we need to find the correct key in storage and delete it.
+	// NOTE: DeleteCert only removes the .crt file from
+	// certmagic's persistent storage. It does NOT evict the certificate from
+	// certmagic's in-memory Cache (a *certmagic.Cache held as the package-level
+	// variable `certCache` in caddytls, unexported).
+	//
+	// Consequence: after DeleteCert, a call to PokeCert → tlsApp.Manage →
+	// certmagic.manageOne() finds the cert in the in-memory cache with managed=true
+	// and returns immediately without triggering ACME. Any subsequent poll loop that
+	// reads the .crt back from storage will time out because storage has no .crt.
+	//
+	// TODO: Consider upstream a change to certmagic to add a method to evict a cert from the in-memory cache
 	prefix := "certificates/"
 	keys, err := c.storage.List(ctx, prefix, false)
 	if err != nil {
