@@ -1,27 +1,8 @@
-import { useState } from "react";
 import type { DNSRecord } from "../api/client";
+import { CopyButton } from "../ui";
 
 interface Props {
   records: DNSRecord[];
-}
-
-function CopyButton({ value }: { value: string }) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(value);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <button
-      onClick={handleCopy}
-      className="ml-2 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline"
-    >
-      {copied ? "Copied!" : "Copy"}
-    </button>
-  );
 }
 
 export function RequiredRecords({ records }: Props) {
