@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { sanitizeUrl } from "../utils/sanitizeUrl";
 import { domainStore } from "../store/domain";
 import { useDomain } from "../hooks/useDomain";
 import { RequiredRecords } from "../components/RequiredRecords";
@@ -97,7 +98,7 @@ export function DomainSetup({ onBackButton }: Props) {
             domain.ownership_verification_mode === "provider_managed" &&
             domain.verify_ownership_url && (
               <a
-                href={domain.verify_ownership_url}
+                href={sanitizeUrl(domain.verify_ownership_url)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="px-3 py-1 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700"

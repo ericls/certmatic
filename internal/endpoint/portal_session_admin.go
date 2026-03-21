@@ -31,11 +31,11 @@ func newPortalSessionAdminEndpoint(
 
 type createPortalSessionRequest struct {
 	Hostname                  string                           `json:"hostname" validate:"required"`
-	BackURL                   string                           `json:"back_url"`
-	BackText                  string                           `json:"back_text"`
+	BackURL                   string                           `json:"back_url" validate:"omitempty,http_url,max=2048"`
+	BackText                  string                           `json:"back_text" validate:"omitempty,max=256"`
 	OwnershipVerificationMode portal.OwnershipVerificationMode `json:"ownership_verification_mode"`
-	VerifyOwnershipURL        string                           `json:"verify_ownership_url"`
-	VerifyOwnershipText       string                           `json:"verify_ownership_text"`
+	VerifyOwnershipURL        string                           `json:"verify_ownership_url" validate:"omitempty,http_url,max=2048"`
+	VerifyOwnershipText       string                           `json:"verify_ownership_text" validate:"omitempty,max=256"`
 }
 
 type createPortalSessionResponse struct {

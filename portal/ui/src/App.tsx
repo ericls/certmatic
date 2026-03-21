@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { DomainSetup } from "./pages/DomainSetup";
 import { ThemeToggle } from "./components/ThemeToggle";
+import { sanitizeUrl } from "./utils/sanitizeUrl";
 
 type Theme = "light" | "dark" | "system";
 
@@ -41,7 +42,7 @@ export default function App() {
           <div className="flex items-center gap-3">
             {backButton && (
               <a
-                href={backButton.url}
+                href={sanitizeUrl(backButton.url)}
                 className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 flex items-center gap-1"
               >
                 <span aria-hidden>←</span>
