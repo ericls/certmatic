@@ -45,6 +45,7 @@ func MakePortalRouter(
 		certMan:          certMan,
 		certWaitTimeout:  2 * time.Minute,
 		certPollInterval: 2 * time.Second,
+		resolver:         netResolver{},
 	}
 
 	// Root: token exchange only.
