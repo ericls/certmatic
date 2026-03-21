@@ -17,12 +17,32 @@ type viteManifestEntry struct {
 	IsEntry bool     `json:"isEntry"`
 }
 
+// antiFlickerScript reads the stored theme from localStorage and applies the "dark"
+// class to <html> synchronously before first paint, preventing a white flash on
+// page load when dark mode is active.
+const antiFlickerScript = `<script>
+  (function(){
+    var t=localStorage.getItem('certmatic-theme');
+    if(t==='dark'||(t!=='light'&&window.matchMedia('(prefers-color-scheme:dark)').matches))
+      document.documentElement.classList.add('dark');
+  })();
+</script>`
+
+// this value needs to be updated in index.css too
+const veryBasicCSS = `
+html.dark {
+  background-color: #111827; /* gray-900 */
+}
+  `
+
 var htmlTmpl = template.Must(template.New("portal").Parse(`<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Certmatic Portal</title>
+  <style>` + veryBasicCSS + `</style>
+` + antiFlickerScript + `
 {{- range .CSS}}
   <link rel="stylesheet" crossorigin href="{{$.Base}}{{.}}">
 {{- end}}
@@ -80,6 +100,8 @@ func GenerateDevHTML() string {
 		"  <meta charset=\"UTF-8\" />\n" +
 		"  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n" +
 		"  <title>Certmatic Portal</title>\n" +
+		"  <style>" + veryBasicCSS + "</style>\n" +
+		antiFlickerScript + "\n" +
 		"</head>\n" +
 		"<body>\n" +
 		"  <div id=\"root\"></div>\n" +
