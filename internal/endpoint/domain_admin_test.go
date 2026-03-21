@@ -15,7 +15,7 @@ import (
 )
 
 func setupTestRouter(repo *domainrepo.InMemoryDomainRepo) chi.Router {
-	dnsManager := dns.NewDNSRecordManager(dns.ChallengeTypeDNS01, "", "")
+	dnsManager := dns.NewDNSRecordManager(dns.ChallengeTypeDNS01, "", "", dns.NetLookup())
 	endpoint := newDomainAdminEndpoint(repo, dnsManager)
 	return endpoint.BuildDomainAdminRouter()
 }
@@ -24,7 +24,7 @@ func TestGetDomain_NotFound(t *testing.T) {
 	repo := domainrepo.NewInMemoryDomainRepo("test")
 	router := setupTestRouter(repo)
 
-	req := httptest.NewRequest(http.MethodGet, "/example.com/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/sub.example.com/", nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -36,13 +36,13 @@ func TestGetDomain_NotFound(t *testing.T) {
 func TestGetDomain_Found(t *testing.T) {
 	repo := domainrepo.NewInMemoryDomainRepo("test")
 	repo.Set(context.Background(), &domain.Domain{
-		Hostname:          "example.com",
+		Hostname:          "sub.example.com",
 		TenantID:          "tenant-1",
 		OwnershipVerified: true,
 	})
 	router := setupTestRouter(repo)
 
-	req := httptest.NewRequest(http.MethodGet, "/example.com/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/sub.example.com/", nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -52,8 +52,8 @@ func TestGetDomain_Found(t *testing.T) {
 
 	resp := decodeData[DomainResponse](t, rec)
 
-	if resp.Hostname != "example.com" {
-		t.Errorf("expected hostname %q, got %q", "example.com", resp.Hostname)
+	if resp.Hostname != "sub.example.com" {
+		t.Errorf("expected hostname %q, got %q", "sub.example.com", resp.Hostname)
 	}
 	if resp.TenantID != "tenant-1" {
 		t.Errorf("expected tenant_id %q, got %q", "tenant-1", resp.TenantID)
@@ -73,7 +73,7 @@ func TestUpsertDomain_Create(t *testing.T) {
 	}
 	bodyBytes, _ := json.Marshal(body)
 
-	req := httptest.NewRequest(http.MethodPut, "/example.com/", bytes.NewReader(bodyBytes))
+	req := httptest.NewRequest(http.MethodPut, "/sub.example.com/", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -84,8 +84,8 @@ func TestUpsertDomain_Create(t *testing.T) {
 
 	resp := decodeData[DomainResponse](t, rec)
 
-	if resp.Hostname != "example.com" {
-		t.Errorf("expected hostname %q, got %q", "example.com", resp.Hostname)
+	if resp.Hostname != "sub.example.com" {
+		t.Errorf("expected hostname %q, got %q", "sub.example.com", resp.Hostname)
 	}
 	if resp.TenantID != "tenant-1" {
 		t.Errorf("expected tenant_id %q, got %q", "tenant-1", resp.TenantID)
@@ -95,7 +95,7 @@ func TestUpsertDomain_Create(t *testing.T) {
 	}
 
 	// Verify domain was stored
-	if _, err := repo.Get(context.Background(), "example.com"); err != nil {
+	if _, err := repo.Get(context.Background(), "sub.example.com"); err != nil {
 		t.Error("expected domain to be stored in repo")
 	}
 }
@@ -103,7 +103,7 @@ func TestUpsertDomain_Create(t *testing.T) {
 func TestUpsertDomain_Update(t *testing.T) {
 	repo := domainrepo.NewInMemoryDomainRepo("test")
 	repo.Set(context.Background(), &domain.Domain{
-		Hostname:          "example.com",
+		Hostname:          "sub.example.com",
 		TenantID:          "tenant-1",
 		OwnershipVerified: false,
 	})
@@ -115,7 +115,7 @@ func TestUpsertDomain_Update(t *testing.T) {
 	}
 	bodyBytes, _ := json.Marshal(body)
 
-	req := httptest.NewRequest(http.MethodPut, "/example.com/", bytes.NewReader(bodyBytes))
+	req := httptest.NewRequest(http.MethodPut, "/sub.example.com/", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -137,7 +137,7 @@ func TestUpsertDomain_Update(t *testing.T) {
 func TestUpsertDomain_PartialUpdate(t *testing.T) {
 	repo := domainrepo.NewInMemoryDomainRepo("test")
 	repo.Set(context.Background(), &domain.Domain{
-		Hostname:          "example.com",
+		Hostname:          "sub.example.com",
 		TenantID:          "tenant-1",
 		OwnershipVerified: false,
 	})
@@ -149,7 +149,7 @@ func TestUpsertDomain_PartialUpdate(t *testing.T) {
 	}
 	bodyBytes, _ := json.Marshal(body)
 
-	req := httptest.NewRequest(http.MethodPut, "/example.com/", bytes.NewReader(bodyBytes))
+	req := httptest.NewRequest(http.MethodPut, "/sub.example.com/", bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -173,7 +173,7 @@ func TestDeleteDomain_NotFound(t *testing.T) {
 	repo := domainrepo.NewInMemoryDomainRepo("test")
 	router := setupTestRouter(repo)
 
-	req := httptest.NewRequest(http.MethodDelete, "/example.com/", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/sub.example.com/", nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -185,11 +185,11 @@ func TestDeleteDomain_NotFound(t *testing.T) {
 func TestDeleteDomain_Success(t *testing.T) {
 	repo := domainrepo.NewInMemoryDomainRepo("test")
 	repo.Set(context.Background(), &domain.Domain{
-		Hostname: "example.com",
+		Hostname: "sub.example.com",
 	})
 	router := setupTestRouter(repo)
 
-	req := httptest.NewRequest(http.MethodDelete, "/example.com/", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/sub.example.com/", nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -198,7 +198,7 @@ func TestDeleteDomain_Success(t *testing.T) {
 	}
 
 	// Verify domain was deleted
-	if _, err := repo.Get(context.Background(), "example.com"); err != domain.ErrNotFound {
+	if _, err := repo.Get(context.Background(), "sub.example.com"); err != domain.ErrNotFound {
 		t.Error("expected domain to be deleted from repo")
 	}
 }

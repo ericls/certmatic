@@ -81,12 +81,12 @@ func detectProviderFromNS(ns string) string {
 
 // lookupNSForZone walks up the domain hierarchy to find NS records,
 // since NS records are typically only set at the zone apex.
-func lookupNSForZone(hostname string) ([]*net.NS, error) {
+func lookupNSForZone(hostname string, l Lookup) ([]*net.NS, error) {
 	hostname = strings.ToLower(strings.TrimSuffix(hostname, "."))
 	labels := strings.Split(hostname, ".")
 	for i := 0; i < len(labels)-1; i++ {
 		candidate := strings.Join(labels[i:], ".")
-		nss, err := net.LookupNS(candidate)
+		nss, err := l.LookupNS(candidate)
 		if err == nil && len(nss) > 0 {
 			return nss, nil
 		}
@@ -97,8 +97,8 @@ func lookupNSForZone(hostname string) ([]*net.NS, error) {
 // getDNSProvider returns the primary DNS provider for the given hostname
 // by inspecting its authoritative NS records. Returns empty string if unknown.
 // When NS records point to multiple providers, returns the one with the most records.
-func getDNSProvider(hostname string) string {
-	nss, err := lookupNSForZone(hostname)
+func getDNSProvider(hostname string, l Lookup) string {
+	nss, err := lookupNSForZone(hostname, l)
 	if err != nil || len(nss) == 0 {
 		return ""
 	}
@@ -132,12 +132,10 @@ func isETLDPlusOne(hostname string) bool {
 	return e == hostname
 }
 
-// Get the "primary" IP address resolved from a hostname.
-// We prefer IPv4 here.
+// nameToIP resolves a hostname to its primary IP address, preferring IPv4.
 // This function expects pre-defined, stable hostnames.
-// Relies on OS DNS caching
-func nameToIP(name string) (net.IP, error) {
-	ips, err := net.LookupIP(name)
+func nameToIP(name string, l Lookup) (net.IP, error) {
+	ips, err := l.LookupIP(name)
 	if err != nil {
 		return nil, err
 	}
