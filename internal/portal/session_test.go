@@ -3,6 +3,9 @@ package portal
 import (
 	"testing"
 	"time"
+
+	reposession "github.com/ericls/certmatic/internal/repo/session"
+	pkgsession "github.com/ericls/certmatic/pkg/session"
 )
 
 // --- Token signing/verification ---
@@ -16,9 +19,9 @@ func TestSignAndVerifySessionID_RoundTrip(t *testing.T) {
 		t.Fatalf("signSessionID failed: %v", err)
 	}
 
-	got, err := verifyTokenGetSessionID(key, token)
+	got, err := pkgsession.VerifyTokenGetSessionID(key, token)
 	if err != nil {
-		t.Fatalf("verifyTokenGetSessionID failed: %v", err)
+		t.Fatalf("VerifyTokenGetSessionID failed: %v", err)
 	}
 	if got != sessionID {
 		t.Errorf("expected session ID %q, got %q", sessionID, got)
@@ -31,30 +34,30 @@ func TestVerifyTokenGetSessionID_TamperedSignature(t *testing.T) {
 	// Flip the last byte of the signature to tamper.
 	tampered := token[:len(token)-1] + string([]byte{token[len(token)-1] ^ 0xff})
 
-	_, err := verifyTokenGetSessionID(key, tampered)
-	if err != ErrInvalidToken {
+	_, err := pkgsession.VerifyTokenGetSessionID(key, tampered)
+	if err != pkgsession.ErrInvalidToken {
 		t.Errorf("expected ErrInvalidToken, got %v", err)
 	}
 }
 
 func TestVerifyTokenGetSessionID_WrongKey(t *testing.T) {
 	token, _ := signSessionID([]byte("key-a"), "test-id")
-	_, err := verifyTokenGetSessionID([]byte("key-b"), token)
-	if err != ErrInvalidToken {
+	_, err := pkgsession.VerifyTokenGetSessionID([]byte("key-b"), token)
+	if err != pkgsession.ErrInvalidToken {
 		t.Errorf("expected ErrInvalidToken, got %v", err)
 	}
 }
 
 func TestVerifyTokenGetSessionID_NoDot(t *testing.T) {
-	_, err := verifyTokenGetSessionID([]byte("key"), "nodothere")
-	if err != ErrInvalidToken {
+	_, err := pkgsession.VerifyTokenGetSessionID([]byte("key"), "nodothere")
+	if err != pkgsession.ErrInvalidToken {
 		t.Errorf("expected ErrInvalidToken, got %v", err)
 	}
 }
 
 func TestVerifyTokenGetSessionID_InvalidBase64Signature(t *testing.T) {
-	_, err := verifyTokenGetSessionID([]byte("key"), "validpart.!!!invalid!!!")
-	if err != ErrInvalidToken {
+	_, err := pkgsession.VerifyTokenGetSessionID([]byte("key"), "validpart.!!!invalid!!!")
+	if err != pkgsession.ErrInvalidToken {
 		t.Errorf("expected ErrInvalidToken, got %v", err)
 	}
 }
@@ -62,20 +65,20 @@ func TestVerifyTokenGetSessionID_InvalidBase64Signature(t *testing.T) {
 // --- MemorySessionStore ---
 
 func TestMemorySessionStore_StoreAndGet(t *testing.T) {
-	store := NewMemorySessionStore()
+	store := reposession.NewMemorySessionStore()
 	defer store.Destruct()
 
-	session := &Session{
+	sess := &pkgsession.Session{
 		SessionID: "test-session-id",
 		Hostname:  "example.com",
 		ExpiresAt: time.Now().Add(time.Hour),
 	}
 
-	if err := store.StoreSession(session); err != nil {
+	if err := store.StoreSession(sess); err != nil {
 		t.Fatalf("StoreSession failed: %v", err)
 	}
 
-	got, err := store.GetSession(session.SessionID)
+	got, err := store.GetSession(sess.SessionID)
 	if err != nil {
 		t.Fatalf("GetSession failed: %v", err)
 	}
@@ -85,97 +88,97 @@ func TestMemorySessionStore_StoreAndGet(t *testing.T) {
 }
 
 func TestMemorySessionStore_GetSession_NotFound(t *testing.T) {
-	store := NewMemorySessionStore()
+	store := reposession.NewMemorySessionStore()
 	defer store.Destruct()
 
 	_, err := store.GetSession("nonexistent")
-	if err != ErrInvalidToken {
+	if err != pkgsession.ErrInvalidToken {
 		t.Errorf("expected ErrInvalidToken, got %v", err)
 	}
 }
 
 func TestMemorySessionStore_GetSession_Expired(t *testing.T) {
-	store := NewMemorySessionStore()
+	store := reposession.NewMemorySessionStore()
 	defer store.Destruct()
 
-	session := &Session{
+	sess := &pkgsession.Session{
 		SessionID: "expired-session",
 		Hostname:  "example.com",
 		ExpiresAt: time.Now().Add(-time.Hour),
 	}
-	store.StoreSession(session)
+	store.StoreSession(sess)
 
 	_, err := store.GetSession("expired-session")
-	if err != ErrExpiredToken {
+	if err != pkgsession.ErrExpiredToken {
 		t.Errorf("expected ErrExpiredToken, got %v", err)
 	}
 }
 
 func TestMemorySessionStore_RedeemToken_Success(t *testing.T) {
-	store := NewMemorySessionStore()
+	store := reposession.NewMemorySessionStore()
 	defer store.Destruct()
 
 	key := []byte("signing-key")
 	token, _, err := CreateToken(store, key, "example.com", time.Hour, "", "",
-		OwnershipVerificationModeDNSChallenge, "", "")
+		pkgsession.OwnershipVerificationModeDNSChallenge, "", "")
 	if err != nil {
 		t.Fatalf("CreateToken failed: %v", err)
 	}
 
-	session, err := store.RedeemToken(key, token)
+	sess, err := store.RedeemToken(key, token)
 	if err != nil {
 		t.Fatalf("RedeemToken failed: %v", err)
 	}
-	if session.Hostname != "example.com" {
-		t.Errorf("expected hostname %q, got %q", "example.com", session.Hostname)
+	if sess.Hostname != "example.com" {
+		t.Errorf("expected hostname %q, got %q", "example.com", sess.Hostname)
 	}
 }
 
 func TestMemorySessionStore_RedeemToken_Replay(t *testing.T) {
-	store := NewMemorySessionStore()
+	store := reposession.NewMemorySessionStore()
 	defer store.Destruct()
 
 	key := []byte("signing-key")
 	token, _, _ := CreateToken(store, key, "example.com", time.Hour, "", "",
-		OwnershipVerificationModeDNSChallenge, "", "")
+		pkgsession.OwnershipVerificationModeDNSChallenge, "", "")
 
 	store.RedeemToken(key, token) // first use
 	_, err := store.RedeemToken(key, token)
-	if err != ErrTokenReplayed {
+	if err != pkgsession.ErrTokenReplayed {
 		t.Errorf("expected ErrTokenReplayed, got %v", err)
 	}
 }
 
 func TestMemorySessionStore_RedeemToken_Expired(t *testing.T) {
-	store := NewMemorySessionStore()
+	store := reposession.NewMemorySessionStore()
 	defer store.Destruct()
 
 	key := []byte("signing-key")
 	token, _, _ := CreateToken(store, key, "example.com", -time.Second, "", "",
-		OwnershipVerificationModeDNSChallenge, "", "")
+		pkgsession.OwnershipVerificationModeDNSChallenge, "", "")
 
 	_, err := store.RedeemToken(key, token)
-	if err != ErrExpiredToken {
+	if err != pkgsession.ErrExpiredToken {
 		t.Errorf("expected ErrExpiredToken, got %v", err)
 	}
 }
 
 func TestMemorySessionStore_RedeemToken_InvalidToken(t *testing.T) {
-	store := NewMemorySessionStore()
+	store := reposession.NewMemorySessionStore()
 	defer store.Destruct()
 
 	_, err := store.RedeemToken([]byte("key"), "invalid.token.that.doesnt.exist")
-	if err != ErrInvalidToken {
+	if err != pkgsession.ErrInvalidToken {
 		t.Errorf("expected ErrInvalidToken, got %v", err)
 	}
 }
 
 func TestMemorySessionStore_ClearExpired(t *testing.T) {
-	store := NewMemorySessionStore()
+	store := reposession.NewMemorySessionStore()
 	defer store.Destruct()
 
-	store.StoreSession(&Session{SessionID: "expired", Hostname: "a.com", ExpiresAt: time.Now().Add(-time.Hour)})
-	store.StoreSession(&Session{SessionID: "active", Hostname: "b.com", ExpiresAt: time.Now().Add(time.Hour)})
+	store.StoreSession(&pkgsession.Session{SessionID: "expired", Hostname: "a.com", ExpiresAt: time.Now().Add(-time.Hour)})
+	store.StoreSession(&pkgsession.Session{SessionID: "active", Hostname: "b.com", ExpiresAt: time.Now().Add(time.Hour)})
 
 	store.ClearExpired()
 
@@ -190,7 +193,7 @@ func TestMemorySessionStore_ClearExpired(t *testing.T) {
 // --- CreateToken full round-trip ---
 
 func TestCreateToken_SessionContents(t *testing.T) {
-	store := NewMemorySessionStore()
+	store := reposession.NewMemorySessionStore()
 	defer store.Destruct()
 
 	key := []byte("round-trip-key")
@@ -200,7 +203,7 @@ func TestCreateToken_SessionContents(t *testing.T) {
 		time.Hour,
 		"https://app.example.com/back",
 		"Back",
-		OwnershipVerificationModeProviderManaged,
+		pkgsession.OwnershipVerificationModeProviderManaged,
 		"https://app.example.com/verify",
 		"Verify Ownership",
 	)
@@ -211,20 +214,20 @@ func TestCreateToken_SessionContents(t *testing.T) {
 		t.Error("expected non-zero expiresAt")
 	}
 
-	session, err := store.RedeemToken(key, token)
+	sess, err := store.RedeemToken(key, token)
 	if err != nil {
 		t.Fatalf("RedeemToken failed: %v", err)
 	}
-	if session.Hostname != "sub.example.com" {
-		t.Errorf("expected hostname %q, got %q", "sub.example.com", session.Hostname)
+	if sess.Hostname != "sub.example.com" {
+		t.Errorf("expected hostname %q, got %q", "sub.example.com", sess.Hostname)
 	}
-	if session.BackURL != "https://app.example.com/back" {
-		t.Errorf("expected back URL %q, got %q", "https://app.example.com/back", session.BackURL)
+	if sess.BackURL != "https://app.example.com/back" {
+		t.Errorf("expected back URL %q, got %q", "https://app.example.com/back", sess.BackURL)
 	}
-	if session.OwnershipVerificationMode != OwnershipVerificationModeProviderManaged {
-		t.Errorf("unexpected ownership mode %q", session.OwnershipVerificationMode)
+	if sess.OwnershipVerificationMode != pkgsession.OwnershipVerificationModeProviderManaged {
+		t.Errorf("unexpected ownership mode %q", sess.OwnershipVerificationMode)
 	}
-	if session.VerifyOwnershipURL != "https://app.example.com/verify" {
-		t.Errorf("unexpected verify URL %q", session.VerifyOwnershipURL)
+	if sess.VerifyOwnershipURL != "https://app.example.com/verify" {
+		t.Errorf("unexpected verify URL %q", sess.VerifyOwnershipURL)
 	}
 }

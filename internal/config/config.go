@@ -24,7 +24,11 @@ func getValidatedStorageType(strValue string, allowedTypes []StorageType) Storag
 	panic("invalid storage type: " + strValue)
 }
 
-func (s *Store) GetDomainStoreType() StorageType {
+// GetStoreType returns the storage type for this store. Defaults to memory if unset.
+func (s *Store) GetStoreType() StorageType {
+	if s.Type == "" {
+		return StorageTypeMemory
+	}
 	return getValidatedStorageType(s.Type, []StorageType{StorageTypeMemory, StorageTypePostgres, StorageTypeSqlite})
 }
 

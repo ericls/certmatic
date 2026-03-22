@@ -10,7 +10,7 @@ import (
 
 	"github.com/ericls/certmatic/internal/certman"
 	"github.com/ericls/certmatic/internal/dns"
-	"github.com/ericls/certmatic/internal/portal"
+	pkgsession "github.com/ericls/certmatic/pkg/session"
 	"github.com/ericls/certmatic/pkg/domain"
 	portalstatic "github.com/ericls/certmatic/portal"
 	"github.com/go-chi/chi/v5"
@@ -29,7 +29,7 @@ func MakePortalRouter(
 	domainRepo domain.DomainRepo,
 	dnsRecordManager *dns.DNSRecordManager,
 	certMan certman.CertMan,
-	sessionStore portal.SessionStore,
+	sessionStore pkgsession.SessionStore,
 	signingKey []byte,
 	portalBaseURL string,
 	devMode bool,
@@ -110,11 +110,11 @@ func serveIndexHTML(w http.ResponseWriter, devMode bool) {
 	w.Write([]byte(html)) //nolint:errcheck
 }
 
-func handleTokenExchange(w http.ResponseWriter, r *http.Request, store portal.SessionStore, signingKey []byte, portalBaseURL string) {
+func handleTokenExchange(w http.ResponseWriter, r *http.Request, store pkgsession.SessionStore, signingKey []byte, portalBaseURL string) {
 	token := r.URL.Query().Get("token")
 	session, err := store.RedeemToken(signingKey, token)
 	if err != nil {
-		if errors.Is(err, portal.ErrExpiredToken) {
+		if errors.Is(err, pkgsession.ErrExpiredToken) {
 			writeError(w, http.StatusUnauthorized, "token expired")
 			return
 		}
@@ -126,7 +126,7 @@ func handleTokenExchange(w http.ResponseWriter, r *http.Request, store portal.Se
 	http.Redirect(w, r, base+"/"+session.SessionID+"/", http.StatusFound)
 }
 
-func sessionMiddlewareByPath(store portal.SessionStore) func(http.Handler) http.Handler {
+func sessionMiddlewareByPath(store pkgsession.SessionStore) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			sessionID := chi.URLParam(r, "sessionID")
@@ -145,7 +145,7 @@ func sessionMiddlewareByPath(store portal.SessionStore) func(http.Handler) http.
 	}
 }
 
-func sessionFromContext(ctx context.Context) *portal.Session {
-	s, _ := ctx.Value(sessionContextKey).(*portal.Session)
+func sessionFromContext(ctx context.Context) *pkgsession.Session {
+	s, _ := ctx.Value(sessionContextKey).(*pkgsession.Session)
 	return s
 }

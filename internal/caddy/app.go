@@ -12,9 +12,11 @@ import (
 	"github.com/caddyserver/caddy/v2/modules/caddyevents"
 	"github.com/ericls/certmatic/internal/config"
 	"github.com/ericls/certmatic/internal/dns"
-	"github.com/ericls/certmatic/internal/portal"
 	internal_domain "github.com/ericls/certmatic/internal/repo/domain"
+	reposession "github.com/ericls/certmatic/internal/repo/session"
+	"github.com/ericls/certmatic/internal/repo/sqlite"
 	"github.com/ericls/certmatic/pkg/domain"
+	pkgsession "github.com/ericls/certmatic/pkg/session"
 	"go.uber.org/zap"
 )
 
@@ -27,6 +29,7 @@ func init() {
 
 type App struct {
 	DomainStore         config.Store      `json:"domain_store,omitempty"`
+	SessionStore        config.Store      `json:"session_store,omitempty"`
 	ChallengeType       dns.ChallengeType `json:"challenge_type,omitempty"`
 	DNSDelegationDomain string            `json:"dns_delegation_domain,omitempty"`
 	CNameTarget         string            `json:"cname_target,omitempty"`
@@ -34,12 +37,12 @@ type App struct {
 	PortalBaseURL       string            `json:"portal_base_url,omitempty"`
 	PortalDevMode       bool              `json:"portal_dev_mode,omitempty"`
 
-	logger           zap.Logger            `json:"-"`
-	config           config.Config         `json:"-"`
-	domainRepo       domain.DomainRepo     `json:"-"`
-	dnsRecordManager *dns.DNSRecordManager `json:"-"`
-	sessionStore     portal.SessionStore   `json:"-"`
-	signingKeyBytes  []byte                `json:"-"`
+	logger           zap.Logger              `json:"-"`
+	config           config.Config           `json:"-"`
+	domainRepo       domain.DomainRepo       `json:"-"`
+	dnsRecordManager *dns.DNSRecordManager   `json:"-"`
+	sessionStore     pkgsession.SessionStore `json:"-"`
+	signingKeyBytes  []byte                  `json:"-"`
 }
 
 func (App) CaddyModule() caddy.ModuleInfo {
@@ -64,19 +67,59 @@ func (a *App) Stop() error {
 	return nil
 }
 
+func loadFromPool(
+	pool *caddy.UsagePool,
+	conf config.Store,
+	keyPrefix string,
+	sqliteCtor func(string) (caddy.Destructor, error),
+	memoryCtor func() (caddy.Destructor, error),
+) (caddy.Destructor, error) {
+	switch conf.GetStoreType() {
+	case config.StorageTypeSqlite:
+		sqliteCfg, err := config.AsSqliteStorageConfig(conf.Config)
+		if err != nil {
+			return nil, fmt.Errorf("parse %s sqlite config: %w", keyPrefix, err)
+		}
+		val, _, err := pool.LoadOrNew(keyPrefix+":sqlite:"+sqliteCfg.FilePath, func() (caddy.Destructor, error) {
+			return sqliteCtor(sqliteCfg.FilePath)
+		})
+		if err != nil {
+			return nil, err
+		}
+		return val.(caddy.Destructor), nil
+	default:
+		val, _, err := pool.LoadOrNew(keyPrefix+":memory", memoryCtor)
+		if err != nil {
+			return nil, err
+		}
+		return val.(caddy.Destructor), nil
+	}
+}
+
 // Provision implements caddy.Provisioner.
 func (a *App) Provision(ctx caddy.Context) error {
 	a.logger = *ctx.Logger(a)
 	a.logger.Debug("provisioning certmatic app")
 
-	domainRepo, _, err := usagePool.LoadOrNew("domainRepo", func() (caddy.Destructor, error) {
-		return internal_domain.NewDomainStoreFromConfig(a.DomainStore)
-	})
+	// --- Domain repo ---
+	val, err := loadFromPool(usagePool, a.DomainStore, "domainRepo",
+		func(fp string) (caddy.Destructor, error) { return sqlite.NewDomainStore(fp) },
+		func() (caddy.Destructor, error) { return internal_domain.NewInMemoryDomainRepo("inmemory"), nil },
+	)
 	if err != nil {
-		a.logger.Error("failed to create or load domain store from config", zap.Error(err))
-		return err
+		return fmt.Errorf("domain store: %w", err)
 	}
-	a.domainRepo = domainRepo.(domain.DomainRepo)
+	a.domainRepo = val.(domain.DomainRepo)
+
+	// --- Session store ---
+	val, err = loadFromPool(usagePool, a.SessionStore, "sessionStore",
+		func(fp string) (caddy.Destructor, error) { return sqlite.NewSessionStore(fp) },
+		func() (caddy.Destructor, error) { return reposession.NewMemorySessionStore(), nil },
+	)
+	if err != nil {
+		return fmt.Errorf("session store: %w", err)
+	}
+	a.sessionStore = val.(pkgsession.SessionStore)
 
 	dnsRecordManager := dns.NewDNSRecordManager(a.ChallengeType, a.DNSDelegationDomain, a.CNameTarget, dns.NetLookup())
 	a.dnsRecordManager = dnsRecordManager
@@ -99,15 +142,6 @@ func (a *App) Provision(ctx caddy.Context) error {
 		}
 		a.signingKeyBytes = key
 	}
-
-	// Portal session store (survives hot-reloads via usagePool)
-	sessionStoreVal, _, err := usagePool.LoadOrNew("portalSessionStore", func() (caddy.Destructor, error) {
-		return portal.NewMemorySessionStore(), nil
-	})
-	if err != nil {
-		return fmt.Errorf("create portal session store: %w", err)
-	}
-	a.sessionStore = sessionStoreVal.(portal.SessionStore)
 
 	return nil
 }

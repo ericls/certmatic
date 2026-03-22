@@ -6,7 +6,7 @@ import (
 
 	"github.com/ericls/certmatic/internal/certman"
 	"github.com/ericls/certmatic/internal/dns"
-	"github.com/ericls/certmatic/internal/portal"
+	pkgsession "github.com/ericls/certmatic/pkg/session"
 	"github.com/ericls/certmatic/pkg/domain"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -18,7 +18,7 @@ func MakeAdminRouter(
 	dnsRecordManager *dns.DNSRecordManager,
 	certMan certman.CertMan,
 	logger *zap.Logger,
-	sessionStore portal.SessionStore,
+	sessionStore pkgsession.SessionStore,
 	signingKey []byte,
 	portalBaseURL string,
 ) chi.Router {

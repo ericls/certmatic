@@ -1,14 +1,16 @@
-package portal
+package session
 
 import (
 	"context"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	pkgsession "github.com/ericls/certmatic/pkg/session"
 )
 
 type sessionEntry struct {
-	session  *Session
+	session  *pkgsession.Session
 	redeemed atomic.Bool
 }
 
@@ -48,48 +50,48 @@ func (s *MemorySessionStore) cleanupLoop(ctx context.Context) {
 }
 
 // StoreSession persists a newly created session.
-func (s *MemorySessionStore) StoreSession(session *Session) error {
+func (s *MemorySessionStore) StoreSession(session *pkgsession.Session) error {
 	entry := &sessionEntry{session: session}
 	s.sessions.Store(session.SessionID, entry)
 	return nil
 }
 
 // RedeemToken validates the HMAC-signed token and returns the stored session (one-time use).
-func (s *MemorySessionStore) RedeemToken(signingKey []byte, token string) (*Session, error) {
-	sessionID, err := verifyTokenGetSessionID(signingKey, token)
+func (s *MemorySessionStore) RedeemToken(signingKey []byte, token string) (*pkgsession.Session, error) {
+	sessionID, err := pkgsession.VerifyTokenGetSessionID(signingKey, token)
 	if err != nil {
 		return nil, err
 	}
 
 	val, ok := s.sessions.Load(sessionID)
 	if !ok {
-		return nil, ErrInvalidToken
+		return nil, pkgsession.ErrInvalidToken
 	}
 	entry := val.(*sessionEntry)
 
 	if time.Now().After(entry.session.ExpiresAt) {
 		s.sessions.Delete(sessionID)
-		return nil, ErrExpiredToken
+		return nil, pkgsession.ErrExpiredToken
 	}
 
 	// Swap returns the old value; if it was already true the token was already redeemed.
 	if entry.redeemed.Swap(true) {
-		return nil, ErrTokenReplayed
+		return nil, pkgsession.ErrTokenReplayed
 	}
 
 	return entry.session, nil
 }
 
 // GetSession returns an active session by ID, pruning expired sessions lazily.
-func (s *MemorySessionStore) GetSession(sessionID string) (*Session, error) {
+func (s *MemorySessionStore) GetSession(sessionID string) (*pkgsession.Session, error) {
 	val, ok := s.sessions.Load(sessionID)
 	if !ok {
-		return nil, ErrInvalidToken
+		return nil, pkgsession.ErrInvalidToken
 	}
 	entry := val.(*sessionEntry)
 	if time.Now().After(entry.session.ExpiresAt) {
 		s.sessions.Delete(sessionID)
-		return nil, ErrExpiredToken
+		return nil, pkgsession.ErrExpiredToken
 	}
 	return entry.session, nil
 }
@@ -106,4 +108,4 @@ func (s *MemorySessionStore) ClearExpired() error {
 	return nil
 }
 
-var _ SessionStore = (*MemorySessionStore)(nil)
+var _ pkgsession.SessionStore = (*MemorySessionStore)(nil)

@@ -27,16 +27,40 @@ func (a *App) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 				} else if strings.HasPrefix(val, "postgres://") {
 					a.DomainStore = config.Store{
 						Type:   string(config.StorageTypePostgres),
-						Config: map[string]interface{}{"ConnectionString": val},
+						Config: map[string]interface{}{"connection_string": val},
 					}
 				} else if strings.HasPrefix(val, "sqlite://") {
 					filePath := strings.TrimPrefix(val, "sqlite://")
 					a.DomainStore = config.Store{
 						Type:   string(config.StorageTypeSqlite),
-						Config: map[string]interface{}{"FilePath": filePath},
+						Config: map[string]interface{}{"file_path": filePath},
 					}
 				} else {
 					return d.Errf("invalid domain store config: %s. Expected 'memory', 'postgres://...' or 'sqlite://...'", val)
+				}
+			case "session_store":
+				if !d.NextArg() {
+					return d.ArgErr()
+				}
+				val := d.Val()
+				if val == "memory" {
+					a.SessionStore = config.Store{
+						Type:   string(config.StorageTypeMemory),
+						Config: map[string]interface{}{},
+					}
+				} else if strings.HasPrefix(val, "postgres://") {
+					a.SessionStore = config.Store{
+						Type:   string(config.StorageTypePostgres),
+						Config: map[string]interface{}{"connection_string": val},
+					}
+				} else if strings.HasPrefix(val, "sqlite://") {
+					filePath := strings.TrimPrefix(val, "sqlite://")
+					a.SessionStore = config.Store{
+						Type:   string(config.StorageTypeSqlite),
+						Config: map[string]interface{}{"file_path": filePath},
+					}
+				} else {
+					return d.Errf("invalid session store config: %s. Expected 'memory', 'postgres://...' or 'sqlite://...'", val)
 				}
 			case "challenge_type":
 				if !d.NextArg() {

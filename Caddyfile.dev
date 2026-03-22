@@ -7,7 +7,8 @@
 
 	# Configure certmatic
 	certmatic {
-		domain_store memory
+		domain_store sqlite://./certmatic-dev.db
+		session_store sqlite://./certmatic-dev.db
 		challenge_type http-01
 		# challenge_type dns-01
 		# dns_delegation_domain _acme-challenge.example.com

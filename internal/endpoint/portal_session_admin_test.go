@@ -9,14 +9,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ericls/certmatic/internal/portal"
+	reposession "github.com/ericls/certmatic/internal/repo/session"
 	domainrepo "github.com/ericls/certmatic/internal/repo/domain"
 	"github.com/ericls/certmatic/pkg/domain"
 )
 
 func setupPortalSessionAdmin() (*portalSessionAdminEndpoint, *domainrepo.InMemoryDomainRepo) {
 	repo := domainrepo.NewInMemoryDomainRepo("test")
-	store := portal.NewMemorySessionStore()
+	store := reposession.NewMemorySessionStore()
 	e := newPortalSessionAdminEndpoint(repo, store, []byte("test-signing-key"), "https://portal.example.com/portal")
 	return e, repo
 }

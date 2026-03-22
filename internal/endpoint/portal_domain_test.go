@@ -11,13 +11,13 @@ import (
 
 	"github.com/ericls/certmatic/internal/certman"
 	"github.com/ericls/certmatic/internal/dns"
-	"github.com/ericls/certmatic/internal/portal"
+	pkgsession "github.com/ericls/certmatic/pkg/session"
 	domainrepo "github.com/ericls/certmatic/internal/repo/domain"
 	"github.com/ericls/certmatic/pkg/domain"
 )
 
 // withSession injects a portal session into a request's context.
-func withSession(r *http.Request, session *portal.Session) *http.Request {
+func withSession(r *http.Request, session *pkgsession.Session) *http.Request {
 	ctx := context.WithValue(r.Context(), sessionContextKey, session)
 	return r.WithContext(ctx)
 }
@@ -87,12 +87,12 @@ func (m *mockLookup) LookupTXT(name string) ([]string, error) {
 
 // portalSession returns a minimal session for sub.tenant.com.
 // Uses ProviderManaged mode to avoid triggering live DNS lookups in handleDomainCheck.
-func portalSession(hostname string) *portal.Session {
-	return &portal.Session{
+func portalSession(hostname string) *pkgsession.Session {
+	return &pkgsession.Session{
 		SessionID:                 "aaaabbbb-0000-0000-0000-000000000001",
 		Hostname:                  hostname,
 		ExpiresAt:                 time.Now().Add(time.Hour),
-		OwnershipVerificationMode: portal.OwnershipVerificationModeProviderManaged,
+		OwnershipVerificationMode: pkgsession.OwnershipVerificationModeProviderManaged,
 	}
 }
 
@@ -210,11 +210,11 @@ func TestPortalGetDomain_DNSChallengeMode_OwnershipTXTRecord(t *testing.T) {
 	})
 	e := newPortalTestEndpoint(repo, nil)
 
-	session := &portal.Session{
+	session := &pkgsession.Session{
 		SessionID:                 "test-session",
 		Hostname:                  "sub.tenant.com",
 		ExpiresAt:                 time.Now().Add(time.Hour),
-		OwnershipVerificationMode: portal.OwnershipVerificationModeDNSChallenge,
+		OwnershipVerificationMode: pkgsession.OwnershipVerificationModeDNSChallenge,
 	}
 	req := withSession(httptest.NewRequest(http.MethodGet, "/", nil), session)
 	rec := httptest.NewRecorder()
@@ -240,11 +240,11 @@ func TestPortalGetDomain_ProviderManagedMode_VerifyURL(t *testing.T) {
 	repo.Set(context.Background(), &domain.Domain{Hostname: "sub.tenant.com"})
 	e := newPortalTestEndpoint(repo, nil)
 
-	session := &portal.Session{
+	session := &pkgsession.Session{
 		SessionID:                 "test-session",
 		Hostname:                  "sub.tenant.com",
 		ExpiresAt:                 time.Now().Add(time.Hour),
-		OwnershipVerificationMode: portal.OwnershipVerificationModeProviderManaged,
+		OwnershipVerificationMode: pkgsession.OwnershipVerificationModeProviderManaged,
 		VerifyOwnershipURL:        "https://app.example.com/verify",
 		VerifyOwnershipText:       "Verify Ownership",
 	}
@@ -677,11 +677,11 @@ func TestPortalDomainCheck_DNSChallenge_AutoVerifiesOwnership(t *testing.T) {
 	}
 	e := newPortalTestEndpointWithLookup(repo, cm, r)
 
-	session := &portal.Session{
+	session := &pkgsession.Session{
 		SessionID:                 "test-session",
 		Hostname:                  "sub.tenant.com",
 		ExpiresAt:                 time.Now().Add(time.Hour),
-		OwnershipVerificationMode: portal.OwnershipVerificationModeDNSChallenge,
+		OwnershipVerificationMode: pkgsession.OwnershipVerificationModeDNSChallenge,
 	}
 	req := withSession(httptest.NewRequest(http.MethodPost, "/", nil), session)
 	rec := httptest.NewRecorder()
@@ -736,11 +736,11 @@ func TestPortalDomainCheck_DNSChallenge_WrongToken_NoAutoVerify(t *testing.T) {
 	}
 	e := newPortalTestEndpointWithLookup(repo, cm, r)
 
-	session := &portal.Session{
+	session := &pkgsession.Session{
 		SessionID:                 "test-session",
 		Hostname:                  "sub.tenant.com",
 		ExpiresAt:                 time.Now().Add(time.Hour),
-		OwnershipVerificationMode: portal.OwnershipVerificationModeDNSChallenge,
+		OwnershipVerificationMode: pkgsession.OwnershipVerificationModeDNSChallenge,
 	}
 	req := withSession(httptest.NewRequest(http.MethodPost, "/", nil), session)
 	rec := httptest.NewRecorder()

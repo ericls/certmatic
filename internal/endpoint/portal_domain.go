@@ -8,7 +8,7 @@ import (
 
 	"github.com/ericls/certmatic/internal/certman"
 	"github.com/ericls/certmatic/internal/dns"
-	"github.com/ericls/certmatic/internal/portal"
+	pkgsession "github.com/ericls/certmatic/pkg/session"
 	"github.com/ericls/certmatic/pkg/domain"
 )
 
@@ -36,7 +36,7 @@ type portalDomainResponse struct {
 	Cert                      *certInfoResponse                `json:"cert"`
 	BackURL                   string                           `json:"back_url,omitempty"`
 	BackText                  string                           `json:"back_text,omitempty"`
-	OwnershipVerificationMode portal.OwnershipVerificationMode `json:"ownership_verification_mode,omitempty"`
+	OwnershipVerificationMode pkgsession.OwnershipVerificationMode `json:"ownership_verification_mode,omitempty"`
 	OwnershipTXTRecord        *domain.DNSRecord                `json:"ownership_txt_record,omitempty"`
 	VerifyOwnershipURL        string                           `json:"verify_ownership_url,omitempty"`
 	VerifyOwnershipText       string                           `json:"verify_ownership_text,omitempty"`
@@ -77,13 +77,13 @@ func (e *portalDomainEndpoint) handleGetDomain() http.HandlerFunc {
 			OwnershipVerificationMode: session.OwnershipVerificationMode,
 		}
 		switch session.OwnershipVerificationMode {
-		case portal.OwnershipVerificationModeDNSChallenge:
+		case pkgsession.OwnershipVerificationModeDNSChallenge:
 			resp.OwnershipTXTRecord = &domain.DNSRecord{
 				Type:  "TXT",
 				Name:  "_certmatic-verify." + session.Hostname,
 				Value: sd.Domain.VerificationToken,
 			}
-		case portal.OwnershipVerificationModeProviderManaged:
+		case pkgsession.OwnershipVerificationModeProviderManaged:
 			resp.VerifyOwnershipURL = session.VerifyOwnershipURL
 			resp.VerifyOwnershipText = session.VerifyOwnershipText
 		}
@@ -222,7 +222,7 @@ func (e *portalDomainEndpoint) handleDomainCheck() http.HandlerFunc {
 		}
 
 		// DNS challenge ownership check.
-		if session.OwnershipVerificationMode == portal.OwnershipVerificationModeDNSChallenge {
+		if session.OwnershipVerificationMode == pkgsession.OwnershipVerificationModeDNSChallenge {
 			ownershipCheck := checkOwnershipTXTRecord(e.lookup, hostname, sd.Domain.VerificationToken)
 			checks = append(checks, ownershipCheck)
 			if ownershipCheck.Status == checkStatusOK && !sd.Domain.OwnershipVerified {
@@ -244,7 +244,7 @@ func (e *portalDomainEndpoint) handleDomainCheck() http.HandlerFunc {
 				Message: "Domain ownership is verified.",
 			})
 		} else if session.OwnershipVerificationMode ==
-			portal.OwnershipVerificationModeProviderManaged {
+			pkgsession.OwnershipVerificationModeProviderManaged {
 			checks = append(checks, domainCheck{
 				Name:    checkNameOwnershipVerified,
 				Status:  checkStatusFail,

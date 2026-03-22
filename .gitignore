@@ -1,3 +1,4 @@
 # local builds
 certmatic
 tmp/
+*.db
