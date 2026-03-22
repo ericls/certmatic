@@ -1,0 +1,24 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/certmatic ./cmd/certmatic"
+  bin = "./tmp/certmatic"
+  full_bin = "./tmp/certmatic run --config ./Caddyfile.dev --adapter caddyfile"
+  delay = 500
+  exclude_dir = ["tmp", "portal/ui", ".git"]
+  include_ext = ["go"]
+  kill_delay = "2s"
+  rerun = false
+  rerun_delay = 500
+  send_interrupt = true
+
+[log]
+  main_only = false
+  time = false
+
+[misc]
+  clean_on_exit = true
+
+[screen]
+  clear_on_rebuild = false
