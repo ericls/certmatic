@@ -105,11 +105,12 @@ All options go inside a `certmatic { }` block in the Caddyfile global options:
 | `portal_base_url`       | Yes       | Full URL where the portal is accessible                                                                               |
 | `portal_dev_mode`       | No        | Flag (no argument). Proxies portal UI to Vite dev server                                                              |
 
-Three Caddy handler directives are provided:
+Four Caddy handler directives are provided:
 
 - `certmatic_admin` — mounts the Admin API. **You must protect this with authentication** (see Caddyfile example above).
 - `certmatic_portal` — mounts the Portal (token exchange + session-scoped API)
 - `certmatic_portal_assets` — serves the built portal UI static assets
+- `certmatic_ask` — mounts the on-demand TLS ask endpoint. Point Caddy's `on_demand_tls { ask <url> }` at this handler. Returns 200 for domains that exist in the system and are ownership-verified, 403 otherwise. Keep this on a localhost-only or private listener — do not expose it publicly.
 
 ## Architecture
 

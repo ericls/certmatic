@@ -17,11 +17,19 @@
 		portal_dev_mode
 	}
 
+	# On-demand TLS: certmatic_ask authorizes certificate issuance
+	on_demand_tls {
+		ask http://localhost:33001/ask
+	}
+
 	local_certs
 }
 
 # sanity check
-:8443 {
+:33443 {
+	tls {
+		on_demand
+	}
 	# return the host name in the body
 	respond "{http.request.host}" 200
 }
@@ -30,6 +38,11 @@
 :33001 {
 	handle_path /admin/* {
 		certmatic_admin
+	}
+
+	# on-demand TLS ask endpoint — keep this on an internal/localhost listener
+	handle /ask {
+		certmatic_ask
 	}
 
 	handle_path /portal/* {

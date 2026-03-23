@@ -249,6 +249,53 @@ curl https://certmatic.your-saas.com/admin/cert/blog.customer.com
 
 Certificates are automatically renewed by Caddy/CertMagic before expiration.
 
+## Step 6: Enable On-Demand TLS
+
+On-demand TLS lets Caddy issue certificates automatically at TLS handshake time — no need to call `/poke` or `/ensure` explicitly. When an unknown domain connects, Caddy queries the `certmatic_ask` endpoint to confirm the domain exists and is verified before issuing a certificate.
+
+### Caddyfile
+
+Add `on_demand_tls` to the global options block and mount `certmatic_ask` on an internal route:
+
+```caddyfile
+{
+    certmatic { ... }
+
+    on_demand_tls {
+        ask http://localhost:33001/ask
+    }
+}
+
+# The server that terminates customer domains
+:443 {
+    tls {
+        on_demand
+    }
+    reverse_proxy your-app:8080
+}
+
+certmatic.your-saas.com {
+    handle_path /admin/* {
+        basic_auth { ... }
+        certmatic_admin
+    }
+
+    # certmatic_ask can be on any route — keep it internal
+    handle /ask {
+        certmatic_ask
+    }
+
+    handle_path /portal/* { certmatic_portal }
+    handle_path /web_client/portal/* { certmatic_portal_assets }
+}
+```
+
+The `ask` URL must be reachable by Caddy's own TLS subsystem. Mounting it on a `localhost`-only listener (e.g., `localhost:33001`) is the recommended pattern — Caddy can reach it internally while it remains inaccessible from the internet.
+
+### Security Considerations
+
+`certmatic_ask` has no built-in authentication — Caddy calls it directly as part of TLS handshake processing. Keep the ask endpoint on a localhost-only or private listener. Do not expose it to the public internet.
+
 ## Security Considerations
 
 ### Securing the Admin API
