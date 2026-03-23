@@ -39,7 +39,7 @@ func (m *DNSRecordManager) GetRequiredDNSRecords(hostname string) []domain.DNSRe
 	records = append(records, pointingRecord)
 	if m.challengeType == ChallengeTypeDNS01 {
 		records = append(records, domain.DNSRecord{
-			Type:  "TXT",
+			Type:  "CNAME",
 			Name:  "_acme-challenge." + hostname,
 			Value: m.dnsDelegationDomain,
 		})

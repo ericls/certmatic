@@ -83,9 +83,46 @@ Domain and session stores can use different backends. Since only in-memory and S
 | Challenge | Pros | Cons |
 |---|---|---|
 | `http-01` | Simple setup. No DNS delegation needed. | Requires port 80 accessible from the internet. |
-| `dns-01` | Works behind firewalls. Supports wildcard certs. | Requires `dns_delegation_domain` configuration and an additional CNAME record from the customer. |
+| `dns-01` | Works behind firewalls. Supports wildcard certs. | Requires a Caddy DNS provider plugin, `dns_delegation_domain` configuration, and an additional CNAME record from the customer. |
 
-For DNS-01, you also need to set `dns_delegation_domain` and ensure your ACME DNS provider is configured to serve challenge responses at that domain.
+**HTTP-01** is the simplest option — Caddy handles it automatically with no extra plugins.
+
+**DNS-01** requires additional setup:
+
+1. **Build Caddy with a DNS provider plugin** — you need a [Caddy DNS provider module](https://caddyserver.com/docs/modules/) that can programmatically create TXT records in the zone where your delegation domain lives. For example, with Cloudflare:
+   ```bash
+   xcaddy build --with github.com/ericls/certmatic --with github.com/caddy-dns/cloudflare
+   ```
+
+2. **Set `dns_delegation_domain`** in the certmatic config — this is the domain where ACME challenge responses will be served (e.g., `_acme-challenge.acme.your-saas.com`). Certmatic will instruct customers to create a CNAME from `_acme-challenge.<their-domain>` pointing to this domain.
+
+3. **Configure the TLS issuer** in your Caddyfile to use DNS-01 with the provider:
+   ```caddyfile
+   :443 {
+       tls {
+           on_demand
+           issuer acme {
+               dns cloudflare {env.CF_API_TOKEN}
+           }
+       }
+   }
+   ```
+
+4. **Ensure the delegation domain's zone is managed** by the DNS provider you configured. When Caddy needs to solve a DNS-01 challenge for `blog.customer.com`, the ACME server follows the CNAME from `_acme-challenge.blog.customer.com` to your delegation domain, where Caddy creates a TXT record via the DNS provider API.
+
+The end-to-end flow:
+```
+blog.customer.com                          your infrastructure
+       │                                          │
+       │ _acme-challenge.blog.customer.com        │
+       │ CNAME → _acme-challenge.acme.your-saas.com
+       │                                          │
+       │                    Caddy DNS provider creates TXT record
+       │                    at _acme-challenge.acme.your-saas.com
+       │                                          │
+       │                    ACME server verifies TXT record
+       │                    Certificate issued ✓
+```
 
 ### Generating a Signing Key
 
@@ -257,6 +294,8 @@ On-demand TLS lets Caddy issue certificates automatically at TLS handshake time 
 
 Add `on_demand_tls` to the global options block and mount `certmatic_ask` on an internal route:
 
+**With HTTP-01 (default):**
+
 ```caddyfile
 {
     certmatic { ... }
@@ -290,13 +329,57 @@ certmatic.your-saas.com {
 }
 ```
 
+**With DNS-01 (requires a DNS provider plugin):**
+
+```caddyfile
+{
+    certmatic {
+        domain_store   sqlite://./certmatic.db
+        session_store  sqlite://./certmatic.db
+        challenge_type dns-01
+        dns_delegation_domain _acme-challenge.acme.your-saas.com
+        cname_target   ingress.your-saas.com
+        portal_signing_key <your-hex-encoded-key>
+        portal_base_url https://certmatic.your-saas.com/portal
+    }
+
+    on_demand_tls {
+        ask http://localhost:33001/ask
+    }
+}
+
+:443 {
+    tls {
+        on_demand
+        issuer acme {
+            dns cloudflare {env.CF_API_TOKEN}
+        }
+    }
+    reverse_proxy your-app:8080
+}
+
+certmatic.your-saas.com {
+    handle_path /admin/* {
+        basic_auth { ... }
+        certmatic_admin
+    }
+
+    handle /ask {
+        certmatic_ask
+    }
+
+    handle_path /portal/* { certmatic_portal }
+    handle_path /web_client/portal/* { certmatic_portal_assets }
+}
+```
+
 The `ask` URL must be reachable by Caddy's own TLS subsystem. Mounting it on a `localhost`-only listener (e.g., `localhost:33001`) is the recommended pattern — Caddy can reach it internally while it remains inaccessible from the internet.
 
-### Security Considerations
+## Security Considerations
+
+### Securing the Ask Endpoint
 
 `certmatic_ask` has no built-in authentication — Caddy calls it directly as part of TLS handshake processing. Keep the ask endpoint on a localhost-only or private listener. Do not expose it to the public internet.
-
-## Security Considerations
 
 ### Securing the Admin API
 

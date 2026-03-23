@@ -98,7 +98,7 @@ All options go inside a `certmatic { }` block in the Caddyfile global options:
 | ----------------------- | --------- | --------------------------------------------------------------------------------------------------------------------- |
 | `domain_store`          | Yes       | Domain storage backend: `memory` or `sqlite://path` (PostgreSQL support is WIP)                                       |
 | `session_store`         | Yes       | Session storage backend: `memory` or `sqlite://path` (PostgreSQL support is WIP)                                      |
-| `challenge_type`        | No        | ACME challenge method: `http-01` (default) or `dns-01`                                                                |
+| `challenge_type`        | No        | ACME challenge method: `http-01` (default) or `dns-01`. DNS-01 requires a [Caddy DNS provider plugin](https://caddyserver.com/docs/modules/) built into the binary and configured in the `tls` block. |
 | `cname_target`          | Yes       | Domain that customer domains should point to (your ingress)                                                           |
 | `dns_delegation_domain` | If dns-01 | Domain for ACME DNS challenge delegation                                                                              |
 | `portal_signing_key`    | No        | Hex-encoded HMAC key for session tokens (min 32 hex chars). Auto-generated if omitted (tokens won't survive restarts) |
