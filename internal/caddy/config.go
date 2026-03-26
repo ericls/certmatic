@@ -8,6 +8,7 @@ import (
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/ericls/certmatic/internal/config"
 	"github.com/ericls/certmatic/internal/dns"
+	"github.com/ericls/certmatic/pkg/webhook"
 )
 
 func (a *App) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
@@ -103,6 +104,22 @@ func (a *App) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 				a.PortalBaseURL = d.Val()
 			case "portal_dev_mode":
 				a.PortalDevMode = true
+			case "webhook_dispatcher":
+				if !d.NextArg() {
+					return d.ArgErr()
+				}
+				a.WebhookDispatcher = webhook.DispatcherConfig{Type: d.Val()}
+				for d.NextBlock(1) {
+					switch d.Val() {
+					case "url":
+						if !d.NextArg() {
+							return d.ArgErr()
+						}
+						a.WebhookDispatcher.URLs = append(a.WebhookDispatcher.URLs, d.Val())
+					default:
+						return d.Errf("unrecognized webhook_dispatcher option: %s", d.Val())
+					}
+				}
 			default:
 				return d.Errf("unrecognized certmatic option: %s", d.Val())
 			}

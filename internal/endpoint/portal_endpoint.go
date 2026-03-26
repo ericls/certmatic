@@ -10,8 +10,9 @@ import (
 
 	"github.com/ericls/certmatic/internal/certman"
 	"github.com/ericls/certmatic/internal/dns"
-	pkgsession "github.com/ericls/certmatic/pkg/session"
 	"github.com/ericls/certmatic/pkg/domain"
+	pkgsession "github.com/ericls/certmatic/pkg/session"
+	"github.com/ericls/certmatic/pkg/webhook"
 	portalstatic "github.com/ericls/certmatic/portal"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -34,18 +35,20 @@ func MakePortalRouter(
 	portalBaseURL string,
 	devMode bool,
 	logger *zap.Logger,
+	webhookDispatcher webhook.Dispatcher,
 ) chi.Router {
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.RequestLogger(&ZapFormatter{Logger: logger}))
 
 	de := &portalDomainEndpoint{
-		domainRepo:       domainRepo,
-		dnsRecordManager: dnsRecordManager,
-		certMan:          certMan,
-		certWaitTimeout:  2 * time.Minute,
-		certPollInterval: 2 * time.Second,
-		lookup:           dns.NetLookup(),
+		domainRepo:        domainRepo,
+		dnsRecordManager:  dnsRecordManager,
+		certMan:           certMan,
+		certWaitTimeout:   2 * time.Minute,
+		certPollInterval:  2 * time.Second,
+		lookup:            dns.NetLookup(),
+		webhookDispatcher: webhookDispatcher,
 	}
 
 	// Root: token exchange only.

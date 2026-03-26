@@ -8,17 +8,19 @@ import (
 
 	"github.com/ericls/certmatic/internal/certman"
 	"github.com/ericls/certmatic/internal/dns"
-	pkgsession "github.com/ericls/certmatic/pkg/session"
 	"github.com/ericls/certmatic/pkg/domain"
+	pkgsession "github.com/ericls/certmatic/pkg/session"
+	"github.com/ericls/certmatic/pkg/webhook"
 )
 
 type portalDomainEndpoint struct {
-	domainRepo       domain.DomainRepo
-	dnsRecordManager *dns.DNSRecordManager
-	certMan          certman.CertMan
-	certWaitTimeout  time.Duration
-	certPollInterval time.Duration
-	lookup           dns.Lookup
+	domainRepo        domain.DomainRepo
+	dnsRecordManager  *dns.DNSRecordManager
+	certMan           certman.CertMan
+	certWaitTimeout   time.Duration
+	certPollInterval  time.Duration
+	lookup            dns.Lookup
+	webhookDispatcher webhook.Dispatcher
 }
 
 // --- GET /portal/api/domain ---
@@ -233,6 +235,11 @@ func (e *portalDomainEndpoint) handleDomainCheck() http.HandlerFunc {
 					return domainCheckResponse{}, err
 				}
 				sd.Domain.OwnershipVerified = true // update local copy for downstream checks in this response
+				e.webhookDispatcher.Dispatch(webhook.Event{
+					Type:      webhook.EventDomainVerified,
+					Timestamp: time.Now(),
+					Data:      map[string]any{"hostname": hostname},
+				})
 			}
 		}
 

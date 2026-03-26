@@ -15,6 +15,9 @@
 		cname_target dispatcher.linki.la
 		portal_base_url http://localhost:33001/portal
 		portal_dev_mode
+		webhook_dispatcher memory {
+			url http://localhost:33001/webhook-echo
+		}
 	}
 
 	# On-demand TLS: certmatic_ask authorizes certificate issuance
@@ -47,6 +50,11 @@
 
 	handle_path /portal/* {
 		certmatic_portal
+	}
+
+	# Webhook echo endpoint — echoes the request body back as the response.
+	handle /webhook-echo {
+		respond "{http.request.body}" 200
 	}
 
 	# In dev, Caddy proxies /web_client/* directly to the Vite dev server.

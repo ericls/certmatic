@@ -14,6 +14,7 @@ import (
 	pkgsession "github.com/ericls/certmatic/pkg/session"
 	domainrepo "github.com/ericls/certmatic/internal/repo/domain"
 	"github.com/ericls/certmatic/pkg/domain"
+	"github.com/ericls/certmatic/pkg/webhook"
 )
 
 // withSession injects a portal session into a request's context.
@@ -31,12 +32,13 @@ func newPortalTestEndpoint(repo domain.DomainRepo, cm certman.CertMan) *portalDo
 
 func newPortalTestEndpointWithLookup(repo domain.DomainRepo, cm certman.CertMan, l dns.Lookup) *portalDomainEndpoint {
 	return &portalDomainEndpoint{
-		domainRepo:       repo,
-		dnsRecordManager: dns.NewDNSRecordManager(dns.ChallengeTypeHTTP01, "", "proxy.saas.internal", l),
-		certMan:          cm,
-		certWaitTimeout:  20 * time.Millisecond,
-		certPollInterval: 0,
-		lookup:           l,
+		domainRepo:        repo,
+		dnsRecordManager:  dns.NewDNSRecordManager(dns.ChallengeTypeHTTP01, "", "proxy.saas.internal", l),
+		certMan:           cm,
+		certWaitTimeout:   20 * time.Millisecond,
+		certPollInterval:  0,
+		lookup:            l,
+		webhookDispatcher: webhook.NoopDispatcher{},
 	}
 }
 

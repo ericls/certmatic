@@ -14,9 +14,11 @@ import (
 	"github.com/ericls/certmatic/internal/dns"
 	internal_domain "github.com/ericls/certmatic/internal/repo/domain"
 	reposession "github.com/ericls/certmatic/internal/repo/session"
+	internalwebhook "github.com/ericls/certmatic/internal/webhook"
 	"github.com/ericls/certmatic/internal/repo/sqlite"
 	"github.com/ericls/certmatic/pkg/domain"
 	pkgsession "github.com/ericls/certmatic/pkg/session"
+	"github.com/ericls/certmatic/pkg/webhook"
 	"go.uber.org/zap"
 )
 
@@ -34,15 +36,17 @@ type App struct {
 	DNSDelegationDomain string            `json:"dns_delegation_domain,omitempty"`
 	CNameTarget         string            `json:"cname_target,omitempty"`
 	PortalSigningKey    string            `json:"portal_signing_key,omitempty"`
-	PortalBaseURL       string            `json:"portal_base_url,omitempty"`
-	PortalDevMode       bool              `json:"portal_dev_mode,omitempty"`
+	PortalBaseURL       string                  `json:"portal_base_url,omitempty"`
+	PortalDevMode       bool                    `json:"portal_dev_mode,omitempty"`
+	WebhookDispatcher   webhook.DispatcherConfig `json:"webhook_dispatcher,omitempty"`
 
-	logger           zap.Logger              `json:"-"`
+	logger              zap.Logger              `json:"-"`
 	config           config.Config           `json:"-"`
 	domainRepo       domain.DomainRepo       `json:"-"`
 	dnsRecordManager *dns.DNSRecordManager   `json:"-"`
 	sessionStore     pkgsession.SessionStore `json:"-"`
-	signingKeyBytes  []byte                  `json:"-"`
+	signingKeyBytes     []byte                  `json:"-"`
+	webhookDispatcher   webhook.Dispatcher      `json:"-"`
 }
 
 func (App) CaddyModule() caddy.ModuleInfo {
@@ -64,6 +68,9 @@ func (a *App) Start() error {
 }
 
 func (a *App) Stop() error {
+	if d, ok := a.webhookDispatcher.(interface{ Destruct() error }); ok {
+		d.Destruct()
+	}
 	return nil
 }
 
@@ -143,7 +150,22 @@ func (a *App) Provision(ctx caddy.Context) error {
 		a.signingKeyBytes = key
 	}
 
+	// --- Webhook dispatcher ---
+	switch a.WebhookDispatcher.Type {
+	case "memory":
+		a.webhookDispatcher = internalwebhook.NewMemoryDispatcher(
+			a.WebhookDispatcher.URLs,
+			ctx.Logger(a).Named("webhook"),
+		)
+	default:
+		a.webhookDispatcher = webhook.NoopDispatcher{}
+	}
+
 	return nil
+}
+
+func (a *App) WebhookDispatcherInstance() webhook.Dispatcher {
+	return a.webhookDispatcher
 }
 
 func (a *App) Handle(ctx context.Context, event caddy.Event) error {
