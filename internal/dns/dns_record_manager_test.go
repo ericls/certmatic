@@ -148,15 +148,15 @@ func TestGetRequiredDNSRecords_DNS01_Subdomain(t *testing.T) {
 		t.Errorf("expected CNAME name %q, got %q", "sub.tenant.com", cname.Name)
 	}
 
-	txt := records[1]
-	if txt.Type != "TXT" {
-		t.Errorf("expected second record to be TXT, got %s", txt.Type)
+	delegation := records[1]
+	if delegation.Type != "CNAME" {
+		t.Errorf("expected second record to be CNAME, got %s", delegation.Type)
 	}
-	if txt.Name != "_acme-challenge.sub.tenant.com" {
-		t.Errorf("expected TXT name %q, got %q", "_acme-challenge.sub.tenant.com", txt.Name)
+	if delegation.Name != "_acme-challenge.sub.tenant.com" {
+		t.Errorf("expected CNAME name %q, got %q", "_acme-challenge.sub.tenant.com", delegation.Name)
 	}
-	if txt.Value != "acme-delegate.saas.example.com" {
-		t.Errorf("expected TXT value %q, got %q", "acme-delegate.saas.example.com", txt.Value)
+	if delegation.Value != "acme-delegate.saas.example.com" {
+		t.Errorf("expected CNAME value %q, got %q", "acme-delegate.saas.example.com", delegation.Value)
 	}
 }
 
