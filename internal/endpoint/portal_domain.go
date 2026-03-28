@@ -32,16 +32,16 @@ type certInfoResponse struct {
 }
 
 type portalDomainResponse struct {
-	Hostname                  string                           `json:"hostname"`
-	OwnershipVerified         bool                             `json:"ownership_verified"`
-	RequiredDNSRecords        []domain.DNSRecord               `json:"required_dns_records"`
-	Cert                      *certInfoResponse                `json:"cert"`
-	BackURL                   string                           `json:"back_url,omitempty"`
-	BackText                  string                           `json:"back_text,omitempty"`
+	Hostname                  string                               `json:"hostname"`
+	OwnershipVerified         bool                                 `json:"ownership_verified"`
+	RequiredDNSRecords        []domain.DNSRecord                   `json:"required_dns_records"`
+	Cert                      *certInfoResponse                    `json:"cert"`
+	BackURL                   string                               `json:"back_url,omitempty"`
+	BackText                  string                               `json:"back_text,omitempty"`
 	OwnershipVerificationMode pkgsession.OwnershipVerificationMode `json:"ownership_verification_mode,omitempty"`
-	OwnershipTXTRecord        *domain.DNSRecord                `json:"ownership_txt_record,omitempty"`
-	VerifyOwnershipURL        string                           `json:"verify_ownership_url,omitempty"`
-	VerifyOwnershipText       string                           `json:"verify_ownership_text,omitempty"`
+	OwnershipTXTRecord        *domain.DNSRecord                    `json:"ownership_txt_record,omitempty"`
+	VerifyOwnershipURL        string                               `json:"verify_ownership_url,omitempty"`
+	VerifyOwnershipText       string                               `json:"verify_ownership_text,omitempty"`
 }
 
 func (e *portalDomainEndpoint) handleGetDomain() http.HandlerFunc {
@@ -159,7 +159,8 @@ func (e *portalDomainEndpoint) handleEnsureCert() http.HandlerFunc {
 			certInfo, err := e.certMan.GetCertInfo(r.Context(), hostname)
 			if err != nil {
 				return portalEnsureCertResponse{}, HTTPError{
-					Status: http.StatusInternalServerError, Message: fmt.Sprintf("error checking certificate: %v", err),
+					Status:  http.StatusInternalServerError,
+					Message: fmt.Sprintf("error checking certificate: %v", err),
 				}
 			}
 			if certInfo != nil && certInfo.NotAfter.After(time.Now()) && certInfo.NotBefore.Before(time.Now()) {

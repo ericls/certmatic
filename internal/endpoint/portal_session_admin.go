@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/ericls/certmatic/internal/portal"
-	pkgsession "github.com/ericls/certmatic/pkg/session"
 	"github.com/ericls/certmatic/pkg/domain"
+	pkgsession "github.com/ericls/certmatic/pkg/session"
 )
 
 type portalSessionAdminEndpoint struct {
@@ -31,12 +31,12 @@ func newPortalSessionAdminEndpoint(
 }
 
 type createPortalSessionRequest struct {
-	Hostname                  string                           `json:"hostname" validate:"required"`
-	BackURL                   string                           `json:"back_url" validate:"omitempty,http_url,max=2048"`
-	BackText                  string                           `json:"back_text" validate:"omitempty,max=256"`
+	Hostname                  string                               `json:"hostname" validate:"required"`
+	BackURL                   string                               `json:"back_url" validate:"omitempty,http_url,max=2048"`
+	BackText                  string                               `json:"back_text" validate:"omitempty,max=256"`
 	OwnershipVerificationMode pkgsession.OwnershipVerificationMode `json:"ownership_verification_mode"`
-	VerifyOwnershipURL        string                           `json:"verify_ownership_url" validate:"omitempty,http_url,max=2048"`
-	VerifyOwnershipText       string                           `json:"verify_ownership_text" validate:"omitempty,max=256"`
+	VerifyOwnershipURL        string                               `json:"verify_ownership_url" validate:"omitempty,http_url,max=2048"`
+	VerifyOwnershipText       string                               `json:"verify_ownership_text" validate:"omitempty,max=256"`
 }
 
 type createPortalSessionResponse struct {

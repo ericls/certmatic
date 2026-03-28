@@ -6,8 +6,8 @@ import (
 
 	"github.com/ericls/certmatic/internal/certman"
 	"github.com/ericls/certmatic/internal/dns"
-	pkgsession "github.com/ericls/certmatic/pkg/session"
 	"github.com/ericls/certmatic/pkg/domain"
+	pkgsession "github.com/ericls/certmatic/pkg/session"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"go.uber.org/zap"

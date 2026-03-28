@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	reposession "github.com/ericls/certmatic/internal/repo/session"
 	domainrepo "github.com/ericls/certmatic/internal/repo/domain"
+	reposession "github.com/ericls/certmatic/internal/repo/session"
 	"github.com/ericls/certmatic/pkg/domain"
 )
 

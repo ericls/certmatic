@@ -14,8 +14,8 @@ import (
 	"github.com/ericls/certmatic/internal/dns"
 	internal_domain "github.com/ericls/certmatic/internal/repo/domain"
 	reposession "github.com/ericls/certmatic/internal/repo/session"
-	internalwebhook "github.com/ericls/certmatic/internal/webhook"
 	"github.com/ericls/certmatic/internal/repo/sqlite"
+	internalwebhook "github.com/ericls/certmatic/internal/webhook"
 	"github.com/ericls/certmatic/pkg/domain"
 	pkgsession "github.com/ericls/certmatic/pkg/session"
 	"github.com/ericls/certmatic/pkg/webhook"
@@ -30,23 +30,23 @@ func init() {
 }
 
 type App struct {
-	DomainStore         config.Store      `json:"domain_store,omitempty"`
-	SessionStore        config.Store      `json:"session_store,omitempty"`
-	ChallengeType       dns.ChallengeType `json:"challenge_type,omitempty"`
-	DNSDelegationDomain string            `json:"dns_delegation_domain,omitempty"`
-	CNameTarget         string            `json:"cname_target,omitempty"`
-	PortalSigningKey    string            `json:"portal_signing_key,omitempty"`
-	PortalBaseURL       string                  `json:"portal_base_url,omitempty"`
-	PortalDevMode       bool                    `json:"portal_dev_mode,omitempty"`
+	DomainStore         config.Store             `json:"domain_store,omitempty"`
+	SessionStore        config.Store             `json:"session_store,omitempty"`
+	ChallengeType       dns.ChallengeType        `json:"challenge_type,omitempty"`
+	DNSDelegationDomain string                   `json:"dns_delegation_domain,omitempty"`
+	CNameTarget         string                   `json:"cname_target,omitempty"`
+	PortalSigningKey    string                   `json:"portal_signing_key,omitempty"`
+	PortalBaseURL       string                   `json:"portal_base_url,omitempty"`
+	PortalDevMode       bool                     `json:"portal_dev_mode,omitempty"`
 	WebhookDispatcher   webhook.DispatcherConfig `json:"webhook_dispatcher,omitempty"`
 
-	logger              zap.Logger              `json:"-"`
-	config           config.Config           `json:"-"`
-	domainRepo       domain.DomainRepo       `json:"-"`
-	dnsRecordManager *dns.DNSRecordManager   `json:"-"`
-	sessionStore     pkgsession.SessionStore `json:"-"`
-	signingKeyBytes     []byte                  `json:"-"`
-	webhookDispatcher   webhook.Dispatcher      `json:"-"`
+	logger            zap.Logger              `json:"-"`
+	config            config.Config           `json:"-"`
+	domainRepo        domain.DomainRepo       `json:"-"`
+	dnsRecordManager  *dns.DNSRecordManager   `json:"-"`
+	sessionStore      pkgsession.SessionStore `json:"-"`
+	signingKeyBytes   []byte                  `json:"-"`
+	webhookDispatcher webhook.Dispatcher      `json:"-"`
 }
 
 func (App) CaddyModule() caddy.ModuleInfo {
@@ -111,7 +111,9 @@ func (a *App) Provision(ctx caddy.Context) error {
 	// --- Domain repo ---
 	val, err := loadFromPool(usagePool, a.DomainStore, "domainRepo",
 		func(fp string) (caddy.Destructor, error) { return sqlite.NewDomainStore(fp) },
-		func() (caddy.Destructor, error) { return internal_domain.NewInMemoryDomainRepo("inmemory"), nil },
+		func() (caddy.Destructor, error) {
+			return internal_domain.NewInMemoryDomainRepo("inmemory"), nil
+		},
 	)
 	if err != nil {
 		return fmt.Errorf("domain store: %w", err)

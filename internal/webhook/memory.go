@@ -42,6 +42,9 @@ func NewMemoryDispatcher(urls []string, logger *zap.Logger) *MemoryDispatcher {
 func (d *MemoryDispatcher) Dispatch(event webhook.Event) {
 	select {
 	case d.queue <- event:
+		d.logger.Debug("enqueued webhook event",
+			zap.String("event_type", string(event.Type)),
+			zap.Time("timestamp", event.Timestamp))
 	default:
 		d.logger.Warn("webhook queue full, dropping event",
 			zap.String("event_type", string(event.Type)))
@@ -75,10 +78,10 @@ func (d *MemoryDispatcher) deliver(ctx context.Context, event webhook.Event) {
 	var wg sync.WaitGroup
 	for _, url := range d.urls {
 		wg.Add(1)
-		go func() {
+		go func(url string) {
 			defer wg.Done()
 			d.deliverToURL(ctx, url, body)
-		}()
+		}(url)
 	}
 	wg.Wait()
 }
@@ -104,6 +107,10 @@ func (d *MemoryDispatcher) deliverToURL(ctx context.Context, url string, body []
 		if err == nil {
 			resp.Body.Close()
 			if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+				d.logger.Debug("webhook delivered successfully",
+					zap.String("url", url),
+					zap.Int("attempt", attempt+1),
+				)
 				return
 			}
 			d.logger.Warn("webhook delivery got non-2xx",

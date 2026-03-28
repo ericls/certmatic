@@ -1,9 +1,9 @@
 package portal
 
 import (
-	"encoding/base64"
 	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
 	"time"
 

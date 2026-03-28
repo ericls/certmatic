@@ -11,9 +11,9 @@ import (
 
 	"github.com/ericls/certmatic/internal/certman"
 	"github.com/ericls/certmatic/internal/dns"
-	pkgsession "github.com/ericls/certmatic/pkg/session"
 	domainrepo "github.com/ericls/certmatic/internal/repo/domain"
 	"github.com/ericls/certmatic/pkg/domain"
+	pkgsession "github.com/ericls/certmatic/pkg/session"
 	"github.com/ericls/certmatic/pkg/webhook"
 )
 
