@@ -28,7 +28,7 @@ Validation errors return HTTP 422 with per-field error details.
 
 The Admin API is mounted via the `certmatic_admin` Caddy handler directive. It provides domain management, certificate management, and portal session creation.
 
-**Authentication:** The Admin API has no built-in authentication. **You must secure it yourself** using Caddy's built-in middleware — `basic_auth`, `forward_auth`, `remote_ip`, mutual TLS, or localhost binding. See the [Integration Guide](integration-guide.md#securing-the-admin-api) for examples of each approach.
+**Authentication:** The Admin API has no built-in authentication. **You must secure it yourself** using Caddy's built-in middleware — `basic_auth`, `forward_auth`, `remote_ip`, mutual TLS, or localhost binding.
 
 ### Domain Endpoints
 

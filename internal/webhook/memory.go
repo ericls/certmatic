@@ -53,6 +53,13 @@ func (d *MemoryDispatcher) Dispatch(event webhook.Event) {
 
 // Destruct stops the background delivery goroutine.
 func (d *MemoryDispatcher) Destruct() error {
+	// Drain the queue before stopping
+	go func() {
+		for event := range d.queue {
+			d.deliver(context.Background(), event)
+		}
+	}()
+	close(d.queue)
 	d.cancel()
 	return nil
 }

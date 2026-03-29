@@ -2,24 +2,21 @@
 
 Certmatic was born out of frustration after repeatedly implementing custom domain support for different SaaS applications. It aims to provide a managed experience for the common tasks involved: on-demand SSL certificate issuance and renewal, domain ownership verification, guiding users through DNS setup, and SSL termination.
 
-Certmatic runs as a [Caddy](https://caddyserver.com) plugin. In a typical setup, a SaaS application uses Certmatic for SSL termination on custom domains and calls its Admin API to manage domain verification and certificate lifecycle. Ultimately Certmatic aims to be composable, for example, to act as a certificate manager alone if you handle SSL termination separately (e.g., with another ingress controller or a CDN).
+In a typical setup Certmatic runs as a [Caddy](https://caddyserver.com) plugin for the custom domain ingress.
+
+A typical user flow looks like this:
+1. A SaaS user goes to their app's settings page and clicks "Add custom domain"
+2. The SaaS persist this setting and calls Certmatic's Admin API to add the domain and create a portal session
+3. The user is redirected to Certmatic's customer portal, which guides them through DNS configuration step by step, verifies ownership, and issues the certificate.
+4. The user is redirected back to the app, and the custom domain is active and secured with SSL.
 
 > **Certmatic is in active development.** Core functionality works (domain management, ownership verification, certificate issuance, portal UI) but APIs and configuration may change. See [Roadmap](#roadmap) below.
-
-## Features
-
-- **Automatic SSL certificates** — on-demand issuance and renewal via ACME (HTTP-01 or DNS-01 challenges)
-- **Domain ownership verification** — DNS TXT challenge or provider-managed verification
-- **Customer-facing portal** — React UI that walks users through DNS configuration step by step
-- **Admin API** — add domains, manage certificates, create portal sessions
-- **Storage** — in-memory or SQLite (PostgreSQL support is WIP). Currently single-node only.
-- **Caddy-native** — runs as a Caddy module with full Caddyfile configuration
 
 ## Quick Start
 
 ### Build
 
-Certmatic is a Caddy plugin. Build it into Caddy using [xcaddy](https://github.com/caddyserver/xcaddy):
+Certmatic can act as a Caddy plugin. Build it into Caddy using [xcaddy](https://github.com/caddyserver/xcaddy):
 
 ```bash
 xcaddy build --with github.com/ericls/certmatic
@@ -32,18 +29,45 @@ xcaddy build --with github.com/ericls/certmatic
 Create a `Caddyfile`:
 
 ```caddyfile
+# Assume the main SaaS app is running on upstream:8080, and Caddy is the ingress for both the app and certmatic portal.
 {
     certmatic {
+        # See below for more configuration options
         domain_store   sqlite://./certmatic.db
         session_store  sqlite://./certmatic.db
         challenge_type http-01
-        cname_target   your-ingress.example.com
+        cname_target   custom-domain.example-saas.com
         portal_signing_key 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
-        portal_base_url https://certmatic.example.com/portal
+        portal_base_url https://certmatic-portal.example-saas.com/
+        webhook_dispatcher memory {
+            url http://upstream:8080/webhooks/certmatic
+        }
+    }
+    on_demand_tls {
+        ask      http://certmatic-internal.example-saas.com/ask
     }
 }
 
-certmatic.example.com {
+example-saas.com {
+    reverse_proxy upstream:8080
+    handle /webhooks/certmatic {
+        # block external access to the webhook endpoint
+        return 403
+    }
+}
+
+certmatic-portal.example-saas.com {
+    handle_path /web_client/* {
+        certmatic_portal_assets
+    }
+    handle_path /* {
+        certmatic_portal
+    }
+}
+
+# This host name is not meant to be publicly accessible.
+# Protect it with authentication and/or bind to a private listener.
+certmatic-internal.example-saas.com {
     # Admin API — protected with basic_auth.
     handle_path /admin/* {
         basic_auth {
@@ -51,18 +75,24 @@ certmatic.example.com {
         }
         certmatic_admin
     }
-
-    handle_path /portal/* {
-        certmatic_portal
+    # Managed `ask` handler for on-demand certificate issuance.
+    handle /ask {
+        certmatic_ask
     }
+}
 
-    handle_path /web_client/portal/* {
-        certmatic_portal_assets
+# This is the main ingress for your users' custom domains. 
+https:// {
+    tls {
+        on_demand
+    }
+    reverse_proxy {
+        to http://upstream:8080
     }
 }
 ```
 
-The Admin API has no built-in authentication — **you must secure it yourself.** Since certmatic is a Caddy plugin, you can use any Caddy middleware to protect the admin routes: `basic_auth`, `forward_auth` (delegate to your app's auth), `remote_ip` (IP allowlisting), mutual TLS, or simply bind the admin handler to a `localhost`-only listener.
+The Admin API has no built-in authentication — **you must secure it yourself.** Since certmatic here runs as a Caddy plugin, you can use any Caddy middleware to protect the admin routes: `basic_auth`, `forward_auth` (delegate to your app's auth), `remote_ip` (IP allowlisting), mutual TLS, or simply bind the admin handler to an internal-only listener.
 
 ### Run
 
@@ -74,18 +104,18 @@ The Admin API has no built-in authentication — **you must secure it yourself.*
 
 ```bash
 # Add a domain
-curl -X PUT https://certmatic.example.com/admin/domain/custom.example.com \
+curl -X PUT https://certmatic-internal.example-saas.com/admin/domain/custom.example.com \
   -d '{"tenant_id": "tenant-123"}'
 
 # Create a portal session for the customer
-curl -X POST https://certmatic.example.com/admin/portal/sessions \
+curl -X POST https://certmatic-internal.example-saas.com/admin/portal/sessions \
   -d '{
     "hostname": "custom.example.com",
     "ownership_verification_mode": "dns_challenge",
-    "back_url": "https://your-app.com/settings",
+    "back_url": "https://example-saas.com/settings/custom-domain",
     "back_text": "Back to settings"
   }'
-# Returns: { "data": { "url": "https://certmatic.example.com/portal/?token=...", "expires_at": "..." } }
+# Returns: { "data": { "url": "https://certmatic-portal.example-saas.com/?token=...", "expires_at": "..." } }
 ```
 
 Redirect your customer to the returned URL. The portal guides them through DNS setup, verifies ownership, and issues the certificate.
@@ -101,9 +131,10 @@ All options go inside a `certmatic { }` block in the Caddyfile global options:
 | `challenge_type`        | No        | ACME challenge method: `http-01` (default) or `dns-01`. DNS-01 requires a [Caddy DNS provider plugin](https://caddyserver.com/docs/modules/) built into the binary and configured in the `tls` block. |
 | `cname_target`          | Yes       | Domain that customer domains should point to (your ingress)                                                           |
 | `dns_delegation_domain` | If dns-01 | Domain for ACME DNS challenge delegation                                                                              |
-| `portal_signing_key`    | No        | Hex-encoded HMAC key for session tokens (min 32 hex chars). Auto-generated if omitted (tokens won't survive restarts) |
+| `portal_signing_key`    | No        | Hex-encoded HMAC key for session tokens (min 32 hex chars). Auto-generated if omitted (auto-generated tokens won't survive restarts) |
 | `portal_base_url`       | Yes       | Full URL where the portal is accessible                                                                               |
-| `portal_dev_mode`       | No        | Flag (no argument). Proxies portal UI to Vite dev server                                                              |
+| `portal_dev_mode`       | No        | When true, proxies portal UI to Vite dev server                                                              |
+| `webhook_dispatcher`    | No        | Webhook event dispatcher. Syntax: `webhook_dispatcher <queue_backend_type> { url <endpoint> }`. Currently only supports `memory` backend type. Multiple `url` lines can be specified. Events (e.g. `domain_verified`) are delivered asynchronously with retries. |
 
 Four Caddy handler directives are provided:
 
@@ -111,31 +142,6 @@ Four Caddy handler directives are provided:
 - `certmatic_portal` — mounts the Portal (token exchange + session-scoped API)
 - `certmatic_portal_assets` — serves the built portal UI static assets
 - `certmatic_ask` — mounts the on-demand TLS ask endpoint. Point Caddy's `on_demand_tls { ask <url> }` at this handler. Returns 200 for domains that exist in the system and are ownership-verified, 403 otherwise. Keep this on a localhost-only or private listener — do not expose it publicly.
-
-## Architecture
-
-```
-┌─────────────────────────────────────────┐
-│                 Caddy                   │
-│                                         │
-│  ┌──────────────┐  ┌────────────────┐   │
-│  │  Admin API   │  │    Portal      │   │
-│  │  (internal)  │  │  (public)      │   │
-│  └──────┬───────┘  └───────┬────────┘   │
-│         │                  │            │
-│  ┌──────┴──────────────────┴────────┐   │
-│  │         Certmatic Module         │   │
-│  │  Domain Repo · Session Store     │   │
-│  │  DNS Manager · Cert Manager      │   │
-│  └──────────────────────────────────┘   │
-└─────────────────────────────────────────┘
-         │                    │
-       SQLite            ACME (Let's Encrypt)
-```
-
-- **Admin API** — your backend calls this to add domains, manage certs, and create portal sessions
-- **Portal** — customer-facing React app (TypeScript + Tailwind) served by Caddy. Guides users through DNS setup, verifies records, and triggers certificate issuance
-- **Certmatic Module** — Caddy app that ties everything together. Manages domain state, DNS record generation, session tokens, and certificate lifecycle via CertMagic
 
 ## Roadmap
 
@@ -150,7 +156,8 @@ Four Caddy handler directives are provided:
 ### Prerequisites
 
 - Go 1.25+
-- Node.js (for portal UI)
+- Node.js 22, for portal UI
+- pnpm, for portal UI
 
 ### Run
 
@@ -164,13 +171,12 @@ This uses [air](https://github.com/air-verse/air) for hot-reloading the Go backe
 
 ```bash
 cd portal/ui
-npm install
-npm run dev    # Vite dev server on :5173
+pnpm install
+pnpm run dev
 ```
 
-With `portal_dev_mode` enabled in the Caddyfile, Caddy proxies `/web_client/*` to the Vite dev server for hot module replacement.
+With `portal_dev_mode` enabled in the Caddyfile, the portal `index.html` file will load portal frontend assets from `/web_client`, you can then delegate that path to the Vite dev server for hot-reloading the UI. This is already set up in `Caddyfile.dev` used by the `run_dev_server.sh` script, assuming the Vite server runs on the default port `5173`.
 
 ## Documentation
 
 - [API Reference](docs/api-reference.md) — full Admin and Portal API documentation
-- [Integration Guide](docs/integration-guide.md) — step-by-step guide for adding certmatic to your SaaS app
