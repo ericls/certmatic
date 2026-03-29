@@ -148,7 +148,6 @@ Four Caddy handler directives are provided:
 - **PostgreSQL storage backend** — enables multi-node deployments (currently limited to single-node with SQLite)
 - **Provider-specific DNS guides in the portal** — step-by-step instructions for popular DNS providers (Cloudflare, Route 53, GoDaddy, etc.)
 - **Ingress-friendly deployment** — support for running behind load balancers and Kubernetes ingress controllers
-- **Webhook / event notifications** — callbacks for domain and certificate lifecycle events (verified, issued, renewed, expiring)
 - **Admin dashboard UI** — web interface for managing domains and certificates
 
 ## Development
