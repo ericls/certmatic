@@ -1,4 +1,6 @@
 # local builds
 certmatic
+caddy
 tmp/
 *.db
+buildenv_*
