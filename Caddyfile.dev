@@ -58,8 +58,11 @@
 	}
 
 	# In dev, Caddy proxies /web_client/* directly to the Vite dev server.
-	# In production, replace this block with: handle_path /web_client/portal/* { certmatic_portal_assets }
 	handle /web_client/* {
 		reverse_proxy localhost:5173
 	}
+	# In production, replace this block with the following to serve the built portal assets directly from Caddy:
+	# handle_path /web_client/portal/* {
+	# 	certmatic_portal_assets
+	# }
 }

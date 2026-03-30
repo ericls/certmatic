@@ -57,7 +57,7 @@ example-saas.com {
 }
 
 certmatic-portal.example-saas.com {
-    handle_path /web_client/* {
+    handle_path /web_client/portal/* {
         certmatic_portal_assets
     }
     handle_path /* {
