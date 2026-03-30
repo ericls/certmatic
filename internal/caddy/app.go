@@ -125,7 +125,9 @@ func (a *App) Provision(ctx caddy.Context) error {
 	// --- Domain repo ---
 	val, err := loadFromPool(usagePool, a.DomainStore, "domainRepo",
 		func(fp string) (caddy.Destructor, error) { return sqlite.NewDomainStore(fp) },
-		func(addr string) (caddy.Destructor, error) { return reporqlite.NewDomainStore(addr) },
+		func(addr string) (caddy.Destructor, error) {
+			return reporqlite.NewDomainStore(addr)
+		},
 		func() (caddy.Destructor, error) {
 			return internal_domain.NewInMemoryDomainRepo("inmemory"), nil
 		},
@@ -138,7 +140,9 @@ func (a *App) Provision(ctx caddy.Context) error {
 	// --- Session store ---
 	val, err = loadFromPool(usagePool, a.SessionStore, "sessionStore",
 		func(fp string) (caddy.Destructor, error) { return sqlite.NewSessionStore(fp) },
-		func(addr string) (caddy.Destructor, error) { return reporqlite.NewSessionStore(addr) },
+		func(addr string) (caddy.Destructor, error) {
+			return reporqlite.NewSessionStore(addr)
+		},
 		func() (caddy.Destructor, error) { return reposession.NewMemorySessionStore(), nil },
 	)
 	if err != nil {

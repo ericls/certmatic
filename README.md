@@ -153,6 +153,13 @@ Three Caddy handler directives are provided:
 - Go 1.25+
 - Node.js 22, for portal UI
 - pnpm, for portal UI
+- [pre-commit](https://pre-commit.com/) (Recommended. If you are familiar with Python tooling, feel free to use whatever is comfortable for you, otherwise you can use `brew install pre-commit` on macOS, or `pipx install pre-commit` cross-platform)
+
+If using pre-commit, remember to install the git hooks:
+
+```bash
+pre-commit install
+```
 
 ### Run
 

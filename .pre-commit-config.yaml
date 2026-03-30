@@ -1,0 +1,30 @@
+repos:
+  - repo: local
+    hooks:
+      - id: gofumpt
+        name: gofumpt
+        language: system
+        entry: bash -c 'GOFUMPT_SPLIT_LONG_LINES=on go tool gofumpt -w -l -extra .'
+        files: \.go$
+        pass_filenames: false
+
+      - id: portal-ui-lint
+        name: Portal UI lint
+        language: system
+        entry: pnpm --dir portal/ui run lint:check
+        files: ^portal/ui/src/
+        pass_filenames: false
+
+      - id: portal-ui-typecheck
+        name: Portal UI typecheck
+        language: system
+        entry: pnpm --dir portal/ui run typecheck
+        files: ^portal/ui/src/
+        pass_filenames: false
+
+      - id: build-portal-ui
+        name: Build portal UI
+        language: system
+        entry: pnpm --dir portal/ui run build
+        files: ^portal/ui/src/
+        pass_filenames: false

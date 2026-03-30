@@ -168,10 +168,12 @@ func TestDomainStore_SetAndGet(t *testing.T) {
 				t.Errorf("TenantID = %q, want %q", got.Domain.TenantID, d.TenantID)
 			}
 			if got.Domain.OwnershipVerified != d.OwnershipVerified {
-				t.Errorf("OwnershipVerified = %v, want %v", got.Domain.OwnershipVerified, d.OwnershipVerified)
+				t.Errorf("OwnershipVerified = %v, want %v",
+					got.Domain.OwnershipVerified, d.OwnershipVerified)
 			}
 			if got.Domain.VerificationToken != d.VerificationToken {
-				t.Errorf("VerificationToken = %q, want %q", got.Domain.VerificationToken, d.VerificationToken)
+				t.Errorf("VerificationToken = %q, want %q",
+					got.Domain.VerificationToken, d.VerificationToken)
 			}
 			if got.Source != store.UniqueID() {
 				t.Errorf("Source = %q, want %q", got.Source, store.UniqueID())
