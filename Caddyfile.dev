@@ -9,9 +9,14 @@
 	certmatic {
 		domain_store sqlite://./certmatic-dev.db
 		session_store sqlite://./certmatic-dev.db
+		# For local test with rqlite:
+		# domain_store rqlite://localhost:4001?disableClusterDiscovery=true
+		# session_store rqlite://localhost:4001?disableClusterDiscovery=true
+
 		challenge_type http-01
 		# challenge_type dns-01
 		# dns_delegation_domain _acme-challenge.example.com
+
 		cname_target dispatcher.linki.la
 		portal_base_url http://localhost:33001/portal
 		portal_dev_mode

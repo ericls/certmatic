@@ -13,6 +13,7 @@ import (
 	"github.com/ericls/certmatic/internal/config"
 	"github.com/ericls/certmatic/internal/dns"
 	internal_domain "github.com/ericls/certmatic/internal/repo/domain"
+	reporqlite "github.com/ericls/certmatic/internal/repo/rqlite"
 	reposession "github.com/ericls/certmatic/internal/repo/session"
 	"github.com/ericls/certmatic/internal/repo/sqlite"
 	internalwebhook "github.com/ericls/certmatic/internal/webhook"
@@ -79,6 +80,7 @@ func loadFromPool(
 	conf config.Store,
 	keyPrefix string,
 	sqliteCtor func(string) (caddy.Destructor, error),
+	rqliteCtor func(string) (caddy.Destructor, error),
 	memoryCtor func() (caddy.Destructor, error),
 ) (caddy.Destructor, error) {
 	switch conf.GetStoreType() {
@@ -89,6 +91,18 @@ func loadFromPool(
 		}
 		val, _, err := pool.LoadOrNew(keyPrefix+":sqlite:"+sqliteCfg.FilePath, func() (caddy.Destructor, error) {
 			return sqliteCtor(sqliteCfg.FilePath)
+		})
+		if err != nil {
+			return nil, err
+		}
+		return val.(caddy.Destructor), nil
+	case config.StorageTypeRqlite:
+		rqliteCfg, err := config.AsRqliteStorageConfig(conf.Config)
+		if err != nil {
+			return nil, fmt.Errorf("parse %s rqlite config: %w", keyPrefix, err)
+		}
+		val, _, err := pool.LoadOrNew(keyPrefix+":rqlite:"+rqliteCfg.HTTPAddr, func() (caddy.Destructor, error) {
+			return rqliteCtor(rqliteCfg.HTTPAddr)
 		})
 		if err != nil {
 			return nil, err
@@ -111,6 +125,7 @@ func (a *App) Provision(ctx caddy.Context) error {
 	// --- Domain repo ---
 	val, err := loadFromPool(usagePool, a.DomainStore, "domainRepo",
 		func(fp string) (caddy.Destructor, error) { return sqlite.NewDomainStore(fp) },
+		func(addr string) (caddy.Destructor, error) { return reporqlite.NewDomainStore(addr) },
 		func() (caddy.Destructor, error) {
 			return internal_domain.NewInMemoryDomainRepo("inmemory"), nil
 		},
@@ -123,6 +138,7 @@ func (a *App) Provision(ctx caddy.Context) error {
 	// --- Session store ---
 	val, err = loadFromPool(usagePool, a.SessionStore, "sessionStore",
 		func(fp string) (caddy.Destructor, error) { return sqlite.NewSessionStore(fp) },
+		func(addr string) (caddy.Destructor, error) { return reporqlite.NewSessionStore(addr) },
 		func() (caddy.Destructor, error) { return reposession.NewMemorySessionStore(), nil },
 	)
 	if err != nil {

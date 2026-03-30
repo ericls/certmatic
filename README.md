@@ -126,8 +126,8 @@ All options go inside a `certmatic { }` block in the Caddyfile global options:
 
 | Directive               | Required  | Description                                                                                                           |
 | ----------------------- | --------- | --------------------------------------------------------------------------------------------------------------------- |
-| `domain_store`          | Yes       | Domain storage backend: `memory` or `sqlite://path` (PostgreSQL support is WIP)                                       |
-| `session_store`         | Yes       | Session storage backend: `memory` or `sqlite://path` (PostgreSQL support is WIP)                                      |
+| `domain_store`          | Yes       | Domain storage backend: `memory`, `sqlite://path`, or `rqlite://host:port?options`. |
+| `session_store`         | Yes       | Session storage backend: `memory`, `sqlite://path`, or `rqlite://host:port?options`. |
 | `challenge_type`        | No        | ACME challenge method: `http-01` (default) or `dns-01`. DNS-01 requires a [Caddy DNS provider plugin](https://caddyserver.com/docs/modules/) built into the binary and configured in the `tls` block. |
 | `cname_target`          | Yes       | Domain that customer domains should point to (your ingress)                                                           |
 | `dns_delegation_domain` | If dns-01 | Domain for ACME DNS challenge delegation                                                                              |
@@ -145,7 +145,7 @@ Four Caddy handler directives are provided:
 
 ## Roadmap
 
-- **PostgreSQL storage backend** — enables multi-node deployments (currently limited to single-node with SQLite)
+- **PostgreSQL storage backend** — for deployments where PostgreSQL is already available
 - **Provider-specific DNS guides in the portal** — step-by-step instructions for popular DNS providers (Cloudflare, Route 53, GoDaddy, etc.)
 - **Ingress-friendly deployment** — support for running behind load balancers and Kubernetes ingress controllers
 - **Admin dashboard UI** — web interface for managing domains and certificates

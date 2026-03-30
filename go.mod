@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	github.com/caddyserver/caddy/v2 v2.10.2
+	github.com/rqlite/gorqlite v0.0.0-20250609141355-ac86a4a1c9a8
 	go.uber.org/zap v1.27.0
 	modernc.org/sqlite v1.47.0
 )

@@ -8,6 +8,7 @@ const (
 	StorageTypeMemory   StorageType = "memory"
 	StorageTypePostgres StorageType = "postgres"
 	StorageTypeSqlite   StorageType = "sqlite"
+	StorageTypeRqlite   StorageType = "rqlite"
 )
 
 type Store struct {
@@ -29,7 +30,7 @@ func (s *Store) GetStoreType() StorageType {
 	if s.Type == "" {
 		return StorageTypeMemory
 	}
-	return getValidatedStorageType(s.Type, []StorageType{StorageTypeMemory, StorageTypePostgres, StorageTypeSqlite})
+	return getValidatedStorageType(s.Type, []StorageType{StorageTypeMemory, StorageTypePostgres, StorageTypeSqlite, StorageTypeRqlite})
 }
 
 // Config represents the configuration for Certmatic.
@@ -47,6 +48,10 @@ type PostgresStorageConfig struct {
 
 type SqliteStorageConfig struct {
 	FilePath string `json:"file_path,omitempty"`
+}
+
+type RqliteStorageConfig struct {
+	HTTPAddr string `json:"http_addr,omitempty"`
 }
 
 func getTypedStorageConfig[T any](rawConfig map[string]any) (*T, error) {
@@ -75,4 +80,8 @@ func AsPostgresStorageConfig(rawConfig map[string]any) (*PostgresStorageConfig, 
 
 func AsSqliteStorageConfig(rawConfig map[string]any) (*SqliteStorageConfig, error) {
 	return getTypedStorageConfig[SqliteStorageConfig](rawConfig)
+}
+
+func AsRqliteStorageConfig(rawConfig map[string]any) (*RqliteStorageConfig, error) {
+	return getTypedStorageConfig[RqliteStorageConfig](rawConfig)
 }

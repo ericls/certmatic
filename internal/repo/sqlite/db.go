@@ -12,7 +12,7 @@ import (
 )
 
 //go:embed migrations/*.sql
-var migrationsFS embed.FS
+var MigrationsFS embed.FS
 
 type sharedDB struct {
 	db    *sql.DB
@@ -76,7 +76,7 @@ func applyMigrations(db *sql.DB) error {
 		return fmt.Errorf("create schema_migrations table: %w", err)
 	}
 
-	entries, err := migrationsFS.ReadDir("migrations")
+	entries, err := MigrationsFS.ReadDir("migrations")
 	if err != nil {
 		return fmt.Errorf("read migrations dir: %w", err)
 	}
@@ -96,7 +96,7 @@ func applyMigrations(db *sql.DB) error {
 			continue
 		}
 
-		data, err := migrationsFS.ReadFile("migrations/" + entry.Name())
+		data, err := MigrationsFS.ReadFile("migrations/" + entry.Name())
 		if err != nil {
 			return fmt.Errorf("read migration %s: %w", entry.Name(), err)
 		}
