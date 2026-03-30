@@ -112,8 +112,11 @@ func (a *App) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 					return d.ArgErr()
 				}
 				a.PortalBaseURL = d.Val()
-			case "portal_dev_mode":
-				a.PortalDevMode = true
+			case "portal_assets_dir":
+				if !d.NextArg() {
+					return d.ArgErr()
+				}
+				a.PortalAssetsDir = d.Val()
 			case "webhook_dispatcher":
 				if !d.NextArg() {
 					return d.ArgErr()

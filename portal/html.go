@@ -2,20 +2,11 @@ package portal
 
 import (
 	"bytes"
-	"encoding/json"
-	"fmt"
+	"crypto/sha256"
+	"encoding/hex"
 	"io/fs"
-	"strings"
 	"text/template"
 )
-
-const webClientBase = "/web_client/portal/"
-
-type viteManifestEntry struct {
-	File    string   `json:"file"`
-	CSS     []string `json:"css"`
-	IsEntry bool     `json:"isEntry"`
-}
 
 // antiFlickerScript reads the stored theme from localStorage and applies the "dark"
 // class to <html> synchronously before first paint, preventing a white flash on
@@ -33,7 +24,7 @@ const veryBasicCSS = `
 html.dark {
   background-color: #111827; /* gray-900 */
 }
-  `
+`
 
 var htmlTmpl = template.Must(template.New("portal").Parse(`<!DOCTYPE html>
 <html lang="en">
@@ -43,80 +34,37 @@ var htmlTmpl = template.Must(template.New("portal").Parse(`<!DOCTYPE html>
   <title>Certmatic Portal</title>
   <style>` + veryBasicCSS + `</style>
 ` + antiFlickerScript + `
-{{- range .CSS}}
-  <link rel="stylesheet" crossorigin href="{{$.Base}}{{.}}">
-{{- end}}
+  <link rel="stylesheet" crossorigin href="{{.AssetsBase}}main.css?v={{.Version}}">
 </head>
 <body>
   <div id="root"></div>
-{{- range .JS}}
-  <script type="module" crossorigin src="{{$.Base}}{{.}}"></script>
-{{- end}}
+  <script type="module" crossorigin src="{{.AssetsBase}}main.js?v={{.Version}}"></script>
 </body>
 </html>`))
 
-type htmlData struct {
-	Base string
-	CSS  []string
-	JS   []string
+// HTMLData holds the data passed to the portal HTML template.
+// Add fields here to inject global variables or server-side config into the page.
+type HTMLData struct {
+	AssetsBase string // URL prefix for portal assets, e.g. "/portal/assets/"
+	Version    string // cache-busting query param value
 }
 
-// GenerateProductionHTML reads the Vite manifest from fsys and returns a complete index.html.
-func GenerateProductionHTML(fsys fs.FS) (string, error) {
-	f, err := fsys.Open(".vite/manifest.json")
-	if err != nil {
-		return "", fmt.Errorf("open vite manifest: %w", err)
-	}
-	defer f.Close()
-
-	var manifest map[string]viteManifestEntry
-	if err := json.NewDecoder(f).Decode(&manifest); err != nil {
-		return "", fmt.Errorf("decode vite manifest: %w", err)
-	}
-
-	data := htmlData{Base: webClientBase}
-	for _, entry := range manifest {
-		if entry.IsEntry {
-			data.JS = append(data.JS, entry.File)
-			data.CSS = append(data.CSS, entry.CSS...)
-		}
-	}
-
+// GenerateHTML renders the portal index.html from the given data.
+func GenerateHTML(data HTMLData) (string, error) {
 	var buf bytes.Buffer
 	if err := htmlTmpl.Execute(&buf, data); err != nil {
-		return "", fmt.Errorf("render HTML: %w", err)
+		return "", err
 	}
 	return buf.String(), nil
 }
 
-// GenerateDevHTML returns an index.html for dev mode with Vite HMR scripts.
-// Assets are loaded from /web_client/ (served by Caddy → Vite proxy), so
-// there are no cross-origin issues.
-func GenerateDevHTML() string {
-	base := webClientBase
-	return "<!DOCTYPE html>\n" +
-		"<html lang=\"en\">\n" +
-		"<head>\n" +
-		"  <meta charset=\"UTF-8\" />\n" +
-		"  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n" +
-		"  <title>Certmatic Portal</title>\n" +
-		"  <style>" + veryBasicCSS + "</style>\n" +
-		antiFlickerScript + "\n" +
-		"</head>\n" +
-		"<body>\n" +
-		"  <div id=\"root\"></div>\n" +
-		"  <script type=\"module\" src=\"" + base + "@vite/client\"></script>\n" +
-		"  <script type=\"module\">\n" +
-		"    import RefreshRuntime from '" + base + "@react-refresh'\n" +
-		"    RefreshRuntime.injectIntoGlobalHook(window)\n" +
-		"    window.$RefreshReg$ = () => {}\n" +
-		"    window.$RefreshSig$ = () => (type) => type\n" +
-		"    window.__vite_plugin_react_preamble_installed__ = true\n" +
-		"  </script>\n" +
-		"  <script type=\"module\" src=\"" + base + "src/main.tsx\"></script>\n" +
-		"</body>\n" +
-		"</html>\n"
+// ComputeVersion hashes the portal asset files to produce a short cache-busting token.
+// Call this once at startup; the result is stable for the lifetime of the process.
+func ComputeVersion(fsys fs.FS) string {
+	h := sha256.New()
+	for _, name := range []string{"main.js", "main.css"} {
+		data, _ := fs.ReadFile(fsys, name)
+		h.Write(data)
+	}
+	return hex.EncodeToString(h.Sum(nil))[:8]
 }
-
-// ensure webClientBase ends with slash (compile-time check via usage)
-var _ = strings.TrimSuffix(webClientBase, "/")

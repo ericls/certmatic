@@ -2,7 +2,9 @@ package caddy
 
 import (
 	"fmt"
+	"io/fs"
 	"net/http"
+	"os"
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
@@ -10,6 +12,7 @@ import (
 	"github.com/caddyserver/caddy/v2/modules/caddytls"
 	"github.com/ericls/certmatic/internal/certman"
 	"github.com/ericls/certmatic/internal/endpoint"
+	portalstatic "github.com/ericls/certmatic/portal"
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 )
@@ -20,7 +23,7 @@ import (
 //
 //	certmatic_portal
 //
-// Dev mode is enabled by setting portal_vite_dev_url in the global certmatic block.
+// Dev mode is enabled by setting portal_dev_dir in the global certmatic block.
 type PortalHandler struct {
 	app    *App
 	logger *zap.Logger
@@ -66,11 +69,21 @@ func (h *PortalHandler) Provision(ctx caddy.Context) error {
 	}
 	certMan := certman.NewCaddyCertMan(storage, tlsApp)
 
-	devMode := h.app.PortalDevMode
-	if devMode {
-		h.logger.Info("portal in dev mode: injecting Vite HMR scripts")
+	var assetsFS fs.FS
+	var version string
+
+	if h.app.PortalAssetsDir != "" {
+		assetsFS = os.DirFS(h.app.PortalAssetsDir)
+		version = portalstatic.ComputeVersion(assetsFS) + "_dynamic"
+		h.logger.Info("portal dev mode", zap.String("dir", h.app.PortalAssetsDir))
 	} else {
-		h.logger.Info("portal in production mode: serving embedded assets")
+		sub, err := fs.Sub(portalstatic.EmbeddedFS, "ui/dist")
+		if err != nil {
+			return fmt.Errorf("portal embedded FS: %w", err)
+		}
+		assetsFS = sub
+		version = portalstatic.ComputeVersion(sub)
+		h.logger.Info("portal prod mode", zap.String("version", version))
 	}
 
 	portalRouter := endpoint.MakePortalRouter(
@@ -80,7 +93,8 @@ func (h *PortalHandler) Provision(ctx caddy.Context) error {
 		h.app.sessionStore,
 		h.app.signingKeyBytes,
 		h.app.PortalBaseURL,
-		devMode,
+		assetsFS,
+		version,
 		h.logger,
 		h.app.webhookDispatcher,
 	)

@@ -38,7 +38,7 @@ type App struct {
 	CNameTarget         string                   `json:"cname_target,omitempty"`
 	PortalSigningKey    string                   `json:"portal_signing_key,omitempty"`
 	PortalBaseURL       string                   `json:"portal_base_url,omitempty"`
-	PortalDevMode       bool                     `json:"portal_dev_mode,omitempty"`
+	PortalAssetsDir     string                   `json:"portal_assets_dir,omitempty"`
 	WebhookDispatcher   webhook.DispatcherConfig `json:"webhook_dispatcher,omitempty"`
 
 	logger            zap.Logger              `json:"-"`

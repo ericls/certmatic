@@ -24,8 +24,7 @@ type contextKey string
 const sessionContextKey contextKey = "portal_session"
 
 // MakePortalRouter creates the chi router for the portal.
-// It only handles /portal/* routes (session management and API).
-// Static web client assets are served separately under /web_client/*.
+// It handles /portal/* routes: static assets, session management, and API.
 func MakePortalRouter(
 	domainRepo domain.DomainRepo,
 	dnsRecordManager *dns.DNSRecordManager,
@@ -33,7 +32,8 @@ func MakePortalRouter(
 	sessionStore pkgsession.SessionStore,
 	signingKey []byte,
 	portalBaseURL string,
-	devMode bool,
+	assetsFS fs.FS,
+	version string,
 	logger *zap.Logger,
 	webhookDispatcher webhook.Dispatcher,
 ) chi.Router {
@@ -51,6 +51,9 @@ func MakePortalRouter(
 		webhookDispatcher: webhookDispatcher,
 	}
 
+	// Static assets — served from embedded FS (prod) or local disk (dev).
+	r.Handle("/assets/*", http.StripPrefix("/assets", http.FileServerFS(assetsFS)))
+
 	// Root: token exchange only.
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		if token := r.URL.Query().Get("token"); token != "" {
@@ -65,7 +68,7 @@ func MakePortalRouter(
 	r.Route("/{sessionID:"+uuidPattern+"}", func(r chi.Router) {
 		r.Use(sessionMiddlewareByPath(sessionStore))
 		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-			serveIndexHTML(w, devMode)
+			serveIndexHTML(w, version)
 		})
 		r.Get("/api/domain", de.handleGetDomain())
 		r.Post("/api/domain/check", de.handleDomainCheck())
@@ -75,38 +78,14 @@ func MakePortalRouter(
 	return r
 }
 
-// MakeWebClientRouter serves the static web client assets from the embedded dist FS.
-// In dev mode this handler is not used — Caddy routes /web_client/* directly to Vite.
-func MakeWebClientRouter() chi.Router {
-	r := chi.NewRouter()
-	r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
-		sub, err := fs.Sub(portalstatic.EmbeddedFS, "ui/dist")
-		if err != nil {
-			http.Error(w, "internal server error", http.StatusInternalServerError)
-			return
-		}
-		path := strings.TrimPrefix(r.URL.Path, "/")
-		http.ServeFileFS(w, r, sub, path)
+func serveIndexHTML(w http.ResponseWriter, version string) {
+	html, err := portalstatic.GenerateHTML(portalstatic.HTMLData{
+		AssetsBase: "/portal/assets/",
+		Version:    version,
 	})
-	return r
-}
-
-func serveIndexHTML(w http.ResponseWriter, devMode bool) {
-	var html string
-	if devMode {
-		html = portalstatic.GenerateDevHTML()
-	} else {
-		sub, err := fs.Sub(portalstatic.EmbeddedFS, "ui/dist")
-		if err != nil {
-			http.Error(w, "internal server error", http.StatusInternalServerError)
-			return
-		}
-		var genErr error
-		html, genErr = portalstatic.GenerateProductionHTML(sub)
-		if genErr != nil {
-			http.Error(w, "portal not built — run npm run build: "+genErr.Error(), http.StatusInternalServerError)
-			return
-		}
+	if err != nil {
+		http.Error(w, "failed to render portal HTML: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)

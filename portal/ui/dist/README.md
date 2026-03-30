@@ -1,0 +1,1 @@
+The dist files are kept so that `xcaddy build` command can work without needing to run `pnpm run build` first.

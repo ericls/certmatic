@@ -19,10 +19,12 @@
 
 		cname_target dispatcher.linki.la
 		portal_base_url http://localhost:33001/portal
-		portal_dev_mode
 		webhook_dispatcher memory {
 			url http://localhost:33001/webhook-echo
 		}
+
+		# Development portal UI directory — Caddy will serve static files from this directory for the portal
+		portal_assets_dir ./portal/ui/dev-build
 	}
 
 	# On-demand TLS: certmatic_ask authorizes certificate issuance
@@ -61,13 +63,4 @@
 	handle /webhook-echo {
 		respond "{http.request.body}" 200
 	}
-
-	# In dev, Caddy proxies /web_client/* directly to the Vite dev server.
-	handle /web_client/* {
-		reverse_proxy localhost:5173
-	}
-	# In production, replace this block with the following to serve the built portal assets directly from Caddy:
-	# handle_path /web_client/portal/* {
-	# 	certmatic_portal_assets
-	# }
 }

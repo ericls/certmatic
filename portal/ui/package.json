@@ -2,16 +2,14 @@
   "name": "certmatic-portal",
   "private": true,
   "version": "0.0.0",
-  "type": "module",
   "packageManager": "pnpm@10.33.0",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview",
+    "dev": "parcel watch src/main.tsx --no-content-hash --dist-dir dev-build --public-url /portal/assets/",
+    "build": "rimraf dist/*.js && rimraf dist/*.css && parcel build src/main.tsx --no-content-hash --dist-dir dist --public-url /portal/assets/ --no-source-maps",
     "lint": "eslint . --fix",
     "lint:check": "eslint .",
     "format": "prettier --write .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit -p tsconfig.app.json"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -21,24 +19,24 @@
     "@eslint/js": "^9.39.4",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.20",
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.5",
     "eslint-plugin-react-hooks": "^7.0.1",
-    "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.4.0",
+    "parcel": "^2.15.1",
     "postcss": "^8.4.45",
     "prettier": "^3.8.1",
+    "rimraf": "^6.1.3",
     "tailwindcss": "^3.4.10",
     "typescript": "^5.5.3",
-    "typescript-eslint": "^8.57.0",
-    "vite": "^5.4.2"
+    "typescript-eslint": "^8.57.0"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
-      "esbuild"
+      "esbuild",
+      "@parcel/watcher"
     ]
   }
 }

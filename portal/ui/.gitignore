@@ -1,5 +1,4 @@
-dist/*
-!dist/.gitkeep
 *.tsbuildinfo
 node_modules/
-.vite
+.parcel-cache/
+dev-build/
