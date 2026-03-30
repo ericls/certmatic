@@ -23,7 +23,9 @@
 			url http://localhost:33001/webhook-echo
 		}
 
-		# Development portal UI directory — Caddy will serve static files from this directory for the portal
+		# By default, certmatic will serve the portal UI assets from embedded resources.
+		# For development, you can specify a directory to serve assets from.
+		# (This is also useful if you want to use an alternative build of the portal UI, e.g. from a fork or branch.)
 		portal_assets_dir ./portal/ui/dev-build
 	}
 
