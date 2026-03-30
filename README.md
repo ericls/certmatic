@@ -57,9 +57,6 @@ example-saas.com {
 }
 
 certmatic-portal.example-saas.com {
-    handle_path /web_client/portal/* {
-        certmatic_portal_assets
-    }
     handle_path /* {
         certmatic_portal
     }
@@ -133,14 +130,13 @@ All options go inside a `certmatic { }` block in the Caddyfile global options:
 | `dns_delegation_domain` | If dns-01 | Domain for ACME DNS challenge delegation                                                                              |
 | `portal_signing_key`    | No        | Hex-encoded HMAC key for session tokens (min 32 hex chars). Auto-generated if omitted (auto-generated tokens won't survive restarts) |
 | `portal_base_url`       | Yes       | Full URL where the portal is accessible                                                                               |
-| `portal_dev_mode`       | No        | When true, proxies portal UI to Vite dev server                                                              |
+| `portal_assets_dir`     | No        | Serve portal UI assets from this local directory instead of the embedded build. Useful for development (point at `portal/ui/dev-build`) or to use a custom/forked portal UI. |
 | `webhook_dispatcher`    | No        | Webhook event dispatcher. Syntax: `webhook_dispatcher <queue_backend_type> { url <endpoint> }`. Currently only supports `memory` backend type. Multiple `url` lines can be specified. Events (e.g. `domain_verified`) are delivered asynchronously with retries. |
 
-Four Caddy handler directives are provided:
+Three Caddy handler directives are provided:
 
 - `certmatic_admin` — mounts the Admin API. **You must protect this with authentication** (see Caddyfile example above).
-- `certmatic_portal` — mounts the Portal (token exchange + session-scoped API)
-- `certmatic_portal_assets` — serves the built portal UI static assets
+- `certmatic_portal` — mounts the Portal (token exchange + session-scoped API + static assets)
 - `certmatic_ask` — mounts the on-demand TLS ask endpoint. Point Caddy's `on_demand_tls { ask <url> }` at this handler. Returns 200 for domains that exist in the system and are ownership-verified, 403 otherwise. Keep this on a localhost-only or private listener — do not expose it publicly.
 
 ## Roadmap
@@ -174,7 +170,16 @@ pnpm install
 pnpm run dev
 ```
 
-With `portal_dev_mode` enabled in the Caddyfile, the portal `index.html` file will load portal frontend assets from `/web_client`, you can then delegate that path to the Vite dev server for hot-reloading the UI. This is already set up in `Caddyfile.dev` used by the `run_dev_server.sh` script, assuming the Vite server runs on the default port `5173`.
+This starts the Parcel watcher, which rebuilds the portal UI into `portal/ui/dev-build/` on every change. The `Caddyfile.dev` used by `run_dev_server.sh` sets `portal_assets_dir ./portal/ui/dev-build`, so the Go server picks up changes on the next page reload. Parcel also injects HMR.
+
+To produce the committed production assets (embedded into the binary on build):
+
+```bash
+cd portal/ui
+pnpm run build
+```
+
+Commit the resulting `portal/ui/dist/` files alongside your Go changes.
 
 ## Documentation
 
