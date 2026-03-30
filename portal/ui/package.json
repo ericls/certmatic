@@ -3,13 +3,14 @@
   "private": true,
   "version": "0.0.0",
   "packageManager": "pnpm@10.33.0",
+  "type": "module",
   "scripts": {
     "dev": "parcel watch src/main.tsx --no-content-hash --dist-dir dev-build --public-url /portal/assets/",
     "build": "rimraf dist/*.js && rimraf dist/*.css && parcel build src/main.tsx --no-content-hash --dist-dir dist --public-url /portal/assets/ --no-source-maps",
     "lint": "eslint . --fix",
     "lint:check": "eslint .",
     "format": "prettier --write .",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "react": "^18.3.1",
