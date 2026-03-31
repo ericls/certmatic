@@ -1,16 +1,18 @@
 # Certmatic
 
-Certmatic was born out of frustration after repeatedly implementing custom domain support for different SaaS applications. It aims to provide a managed experience for the common tasks involved: on-demand SSL certificate issuance and renewal, domain ownership verification, guiding users through DNS setup, and SSL termination.
+Certmatic was born out of frustration after repeatedly implementing custom domain support for different SaaS applications. It aims to provide a managed experience for the common tasks involved.
 
-In a typical setup Certmatic runs as a [Caddy](https://caddyserver.com) plugin for the custom domain ingress.
+Certmatic aims to be composable. It aims to allow users to pick whatever they need from the stack, whether it's just the portal UI, or it does the certificate obtaining without terminating TLS itself. (Some of these usage patterns are not fully supported or tested yet.)
+
+That being said, a typical setup would include Certmatic as a plugin for the [Caddy](https://caddyserver.com) instance that serves the custom domain traffic.
 
 A typical user flow looks like this:
-1. A SaaS user goes to their app's settings page and clicks "Add custom domain"
-2. The SaaS persist this setting and calls Certmatic's Admin API to add the domain and create a portal session
+1. A SaaS user goes to the SaaS app's settings page and clicks "Add custom domain"
+2. The SaaS persists this setting and calls Certmatic's Admin API to add the domain and create a portal session
 3. The user is redirected to Certmatic's customer portal, which guides them through DNS configuration step by step, verifies ownership, and issues the certificate.
 4. The user is redirected back to the app, and the custom domain is active and secured with SSL.
 
-> **Certmatic is in active development.** Core functionality works but APIs and configuration may change.
+> **⚠️ Certmatic is in active development.**
 
 ## Quick Start
 
@@ -29,14 +31,24 @@ xcaddy build --with github.com/ericls/certmatic
 Create a `Caddyfile`:
 
 ```caddyfile
-# Assume the main SaaS app is running on upstream:8080, and Caddy is the ingress for both the app and certmatic portal.
+# Assumptions:
+# the main SaaS app is running on upstream:8080
+# the entrypoint for custom domain traffic is upstream-for-custom-domains:8080
+# and Caddy is the ingress for both the app and certmatic portal.
+# 
+# Caddy is a powerful and flexible server, feel free to adjust the configuration to fit your architecture
 {
     certmatic {
-        # See below for more configuration options
+        # (See below for more configuration options)
         domain_store   sqlite://./certmatic.db
         session_store  sqlite://./certmatic.db
+        # For rqlite:
+        # domain_store rqlite://rqlite-server:4001?options...
+        # session_store rqlite://rqlite-server:4001?options...
+
         challenge_type http-01
         cname_target   custom-domain.example-saas.com
+
         portal_signing_key 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
         portal_base_url https://certmatic-portal.example-saas.com/
         webhook_dispatcher memory {
@@ -64,6 +76,7 @@ certmatic-portal.example-saas.com {
 
 # This host name is not meant to be publicly accessible.
 # Protect it with authentication and/or bind to a private listener.
+# Caddy comes with many built-in middleware options for authentication and access control, don't miss out on these.
 certmatic-internal.example-saas.com {
     # Admin API — protected with basic_auth.
     handle_path /admin/* {
@@ -84,16 +97,29 @@ https:// {
         on_demand
     }
     reverse_proxy {
-        to http://upstream:8080
+        to http://upstream-for-custom-domains:8080
     }
+}
+# Should probably handle non-HTTPS traffic to the custom domains too, maybe just redirecting to HTTPS
+http:// {
+    # replace with your desired behavior for non-HTTPS traffic to custom domains...
 }
 ```
 
 The Admin API has no built-in authentication — **you must secure it yourself.** Since certmatic here runs as a Caddy plugin, you can use any Caddy middleware to protect the admin routes: `basic_auth`, `forward_auth` (delegate to your app's auth), `remote_ip` (IP allowlisting), mutual TLS, or simply bind the admin handler to an internal-only listener.
 
+With this setup, here are how things communicate:
+- The SaaS app backend calls certmatic's Admin API at `certmatic-internal.example-saas.com/admin/*` to manage domains and create portal sessions
+- The portal UI is served at `certmatic-portal.example-saas.com/*`
+- The on-demand TLS `ask` endpoint becomes an internal API call
+- End users accessing through the custom domains (`something-fun.example.com`) will be served by `upstream-for-custom-domains:8080` once their domain is verified
+
 ### Run
 
 ```bash
+# This is a simple example, usually you'd already have Caddy as a service somewhere.
+# Please read xcaddy's documentation for more details on how to package/run Caddy with plugin in production:
+# https://caddyserver.com/docs/build#package-support-files-for-custom-builds-for-debianubunturaspbian
 ./caddy run --config Caddyfile --adapter caddyfile
 ```
 
@@ -104,7 +130,7 @@ The Admin API has no built-in authentication — **you must secure it yourself.*
 curl -X PUT https://certmatic-internal.example-saas.com/admin/domain/custom.example.com \
   -d '{"tenant_id": "tenant-123"}'
 
-# Create a portal session for the customer
+# Create a portal session for the customer, using the DNS challenge verification mode.
 curl -X POST https://certmatic-internal.example-saas.com/admin/portal/sessions \
   -d '{
     "hostname": "custom.example.com",
@@ -112,10 +138,22 @@ curl -X POST https://certmatic-internal.example-saas.com/admin/portal/sessions \
     "back_url": "https://example-saas.com/settings/custom-domain",
     "back_text": "Back to settings"
   }'
+
+# Create a portal session for the customer, using the provider managed verification mode.
+# if you choose this, you will verify domain ownership yourself. On the portal UI, the DNS challenge step will be replaced with a button that redirects the end user to a URL you set. The button text and redirect URL can be set with `verify_ownership_text` and `verify_ownership_url`.
+curl -X POST https://certmatic-internal.example-saas.com/admin/portal/sessions \
+  -d '{
+    "hostname": "custom.example.com",
+    "ownership_verification_mode": "provider_managed",
+    "verify_ownership_url": "https://example-saas.com/settings/custom-domain/verify",
+    "verify_ownership_text": "Verify ownership",
+    "back_url": "https://example-saas.com/settings/custom-domain",
+    "back_text": "Back to settings"
+  }'
 # Returns: { "data": { "url": "https://certmatic-portal.example-saas.com/?token=...", "expires_at": "..." } }
 ```
 
-Redirect your customer to the returned URL. The portal guides them through DNS setup, verifies ownership, and issues the certificate.
+Redirect your customer to the returned URL. The portal guides them through ownership verification and DNS configuration.
 
 ## Configuration Reference
 
