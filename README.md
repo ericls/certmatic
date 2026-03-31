@@ -179,6 +179,7 @@ Three Caddy handler directives are provided:
 
 ## Roadmap
 
+- **domainconnect.org spec implementation** — allow end users to automatically configure their DNS
 - **PostgreSQL storage backend** — for deployments where PostgreSQL is already available
 - **Provider-specific DNS guides in the portal** — step-by-step instructions for popular DNS providers (Cloudflare, Route 53, GoDaddy, etc.)
 - **Ingress-friendly deployment** — support for running behind load balancers and Kubernetes ingress controllers
