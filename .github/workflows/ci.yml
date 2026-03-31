@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.0'
+
+      - run: go build ./...
+
+      - run: go test ./...
+
+      - name: Check formatting
+        run: |
+          GOFUMPT_SPLIT_LONG_LINES=on go tool gofumpt -w -extra .
+          git diff --exit-code
+
+  portal-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: portal/ui/package.json
+
+      - name: Install dependencies
+        run: pnpm --dir portal/ui install
+
+      - name: Lint
+        run: pnpm --dir portal/ui run lint:check
+
+      - name: Typecheck
+        run: pnpm --dir portal/ui run typecheck
+
+      - name: Build and verify dist is in sync
+        run: |
+          pnpm --dir portal/ui run build
+          git diff --exit-code portal/ui/dist/
