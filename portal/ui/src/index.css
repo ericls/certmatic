@@ -7,6 +7,6 @@ html {
   background-color: white;
 }
 html.dark {
-  /* This value needs to be updated in portal/html.go too */
+  /* This value needs to be updated in portal/index.html.tmpl too */
   background-color: #111827; /* gray-900 */
 }

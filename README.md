@@ -10,7 +10,7 @@ A typical user flow looks like this:
 3. The user is redirected to Certmatic's customer portal, which guides them through DNS configuration step by step, verifies ownership, and issues the certificate.
 4. The user is redirected back to the app, and the custom domain is active and secured with SSL.
 
-> **Certmatic is in active development.** Core functionality works (domain management, ownership verification, certificate issuance, portal UI) but APIs and configuration may change. See [Roadmap](#roadmap) below.
+> **Certmatic is in active development.** Core functionality works but APIs and configuration may change.
 
 ## Quick Start
 
@@ -191,3 +191,9 @@ Commit the resulting `portal/ui/dist/` files alongside your Go changes.
 ## Documentation
 
 - [API Reference](docs/api-reference.md) — full Admin and Portal API documentation
+
+## License
+
+The Certmatic server is licensed under the [GNU Affero General Public License v3.0](LICENSE).
+
+The portal UI (`portal/ui/`) is licensed under the [MIT License](portal/ui/LICENSE).

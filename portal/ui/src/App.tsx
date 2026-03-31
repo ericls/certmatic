@@ -10,6 +10,8 @@ interface BackButton {
   text: string;
 }
 
+const sourceURL = "https://github.com/ericls/certmatic";
+
 function applyTheme(theme: Theme) {
   const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
   const isDark = theme === "dark" || (theme === "system" && prefersDark);
@@ -59,6 +61,21 @@ export default function App() {
       <main>
         <DomainSetup onBackButton={setBackButton} />
       </main>
+      <footer className="border-t border-gray-200 bg-white/80 dark:border-gray-800 dark:bg-gray-900/80">
+        <div className="max-w-3xl mx-auto px-4 py-4 text-xs text-gray-500 dark:text-gray-400 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <p>Certmatic Portal</p>
+          <div className="flex items-center gap-4">
+            <a
+              href={sourceURL}
+              target="_blank"
+              rel="noreferrer"
+              className="hover:text-gray-700 dark:hover:text-gray-200 underline underline-offset-2"
+            >
+              Source
+            </a>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

@@ -3,44 +3,16 @@ package portal
 import (
 	"bytes"
 	"crypto/sha256"
+	"embed"
 	"encoding/hex"
 	"io/fs"
 	"text/template"
 )
 
-// antiFlickerScript reads the stored theme from localStorage and applies the "dark"
-// class to <html> synchronously before first paint, preventing a white flash on
-// page load when dark mode is active.
-const antiFlickerScript = `<script>
-  (function(){
-    var t=localStorage.getItem('certmatic-theme');
-    if(t==='dark'||(t!=='light'&&window.matchMedia('(prefers-color-scheme:dark)').matches))
-      document.documentElement.classList.add('dark');
-  })();
-</script>`
+//go:embed index.html.tmpl
+var htmlTemplateFS embed.FS
 
-// this value needs to be updated in index.css too
-const veryBasicCSS = `
-html.dark {
-  background-color: #111827; /* gray-900 */
-}
-`
-
-var htmlTmpl = template.Must(template.New("portal").Parse(`<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Certmatic Portal</title>
-  <style>` + veryBasicCSS + `</style>
-` + antiFlickerScript + `
-  <link rel="stylesheet" crossorigin href="{{.AssetsBase}}main.css?v={{.Version}}">
-</head>
-<body>
-  <div id="root"></div>
-  <script type="module" crossorigin src="{{.AssetsBase}}main.js?v={{.Version}}"></script>
-</body>
-</html>`))
+var htmlTmpl = template.Must(template.ParseFS(htmlTemplateFS, "index.html.tmpl"))
 
 // HTMLData holds the data passed to the portal HTML template.
 // Add fields here to inject global variables or server-side config into the page.

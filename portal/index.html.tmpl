@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<!--
+  License information:
+  Certmatic server: GNU Affero General Public License v3.0
+  Portal web client (portal/ui): MIT License
+  Source: https://github.com/ericls/certmatic
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Certmatic Portal</title>
+  <meta name="source-code" content="https://github.com/ericls/certmatic" />
+  {{/* This value needs to be updated in portal/ui/src/index.css too. */}}
+  <style>
+html.dark {
+  background-color: #111827; /* gray-900 */
+}
+  </style>
+  <script>
+    (function(){
+      var t=localStorage.getItem('certmatic-theme');
+      if(t==='dark'||(t!=='light'&&window.matchMedia('(prefers-color-scheme:dark)').matches))
+        document.documentElement.classList.add('dark');
+    })();
+  </script>
+  <link rel="stylesheet" crossorigin href="{{.AssetsBase}}main.css?v={{.Version}}">
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" crossorigin src="{{.AssetsBase}}main.js?v={{.Version}}"></script>
+</body>
+</html>
