@@ -1,7 +1,6 @@
 package session
 
 import (
-	"context"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -18,35 +17,18 @@ type sessionEntry struct {
 // It survives Caddy config hot-reloads when kept in the usagePool.
 type MemorySessionStore struct {
 	sessions sync.Map // map[string]*sessionEntry
-	cancel   context.CancelFunc
 }
 
 // Destruct implements caddy.Destructor — stops the background cleanup goroutine.
 func (s *MemorySessionStore) Destruct() error {
-	s.cancel()
 	return nil
 }
 
 // NewMemorySessionStore returns a new in-memory session store and starts a background
 // goroutine that periodically evicts expired sessions.
 func NewMemorySessionStore() *MemorySessionStore {
-	ctx, cancel := context.WithCancel(context.Background())
-	s := &MemorySessionStore{cancel: cancel}
-	go s.cleanupLoop(ctx)
+	s := &MemorySessionStore{}
 	return s
-}
-
-func (s *MemorySessionStore) cleanupLoop(ctx context.Context) {
-	ticker := time.NewTicker(5 * time.Minute)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			_ = s.ClearExpired()
-		}
-	}
 }
 
 // StoreSession persists a newly created session.

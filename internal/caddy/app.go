@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"time"
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
@@ -48,6 +49,7 @@ type App struct {
 	sessionStore      pkgsession.SessionStore `json:"-"`
 	signingKeyBytes   []byte                  `json:"-"`
 	webhookDispatcher webhook.Dispatcher      `json:"-"`
+	cancelCleanup     context.CancelFunc      `json:"-"`
 }
 
 func (App) CaddyModule() caddy.ModuleInfo {
@@ -65,10 +67,35 @@ func (a *App) Start() error {
 		zap.String("dns_delegation_domain", a.DNSDelegationDomain),
 		zap.String("cname_target", a.CNameTarget),
 	)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	a.cancelCleanup = cancel
+	go a.sessionCleanupLoop(ctx)
+
 	return nil
 }
 
+func (a *App) sessionCleanupLoop(ctx context.Context) {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if err := a.sessionStore.ClearExpired(); err != nil {
+				a.logger.Error("failed to clear expired sessions", zap.Error(err))
+			} else {
+				a.logger.Debug("cleared expired sessions")
+			}
+		}
+	}
+}
+
 func (a *App) Stop() error {
+	if a.cancelCleanup != nil {
+		a.cancelCleanup()
+	}
 	if d, ok := a.webhookDispatcher.(interface{ Destruct() error }); ok {
 		d.Destruct()
 	}
