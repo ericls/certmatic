@@ -15,23 +15,23 @@ import (
 // MemoryDispatcher is an in-memory webhook event dispatcher.
 // Events are queued in a buffered channel and delivered by a background goroutine.
 type MemoryDispatcher struct {
-	urls   []string
-	queue  chan webhook.Event
-	client *http.Client
-	logger *zap.Logger
-	cancel context.CancelFunc
+	endpoints []webhook.Endpoint
+	queue     chan webhook.Event
+	client    *http.Client
+	logger    *zap.Logger
+	cancel    context.CancelFunc
 }
 
-// NewMemoryDispatcher creates a dispatcher that delivers events to the given URLs.
+// NewMemoryDispatcher creates a dispatcher that delivers events to the given endpoints.
 // A background goroutine processes the queue until Destruct is called.
-func NewMemoryDispatcher(urls []string, logger *zap.Logger) *MemoryDispatcher {
+func NewMemoryDispatcher(endpoints []webhook.Endpoint, logger *zap.Logger) *MemoryDispatcher {
 	ctx, cancel := context.WithCancel(context.Background())
 	d := &MemoryDispatcher{
-		urls:   urls,
-		queue:  make(chan webhook.Event, 1000),
-		client: &http.Client{Timeout: 10 * time.Second},
-		logger: logger,
-		cancel: cancel,
+		endpoints: endpoints,
+		queue:     make(chan webhook.Event, 1000),
+		client:    &http.Client{Timeout: 10 * time.Second},
+		logger:    logger,
+		cancel:    cancel,
 	}
 	go d.deliveryLoop(ctx)
 	return d
@@ -83,17 +83,17 @@ func (d *MemoryDispatcher) deliver(ctx context.Context, event webhook.Event) {
 	}
 
 	var wg sync.WaitGroup
-	for _, url := range d.urls {
+	for _, ep := range d.endpoints {
 		wg.Add(1)
-		go func(url string) {
+		go func(ep webhook.Endpoint) {
 			defer wg.Done()
-			d.deliverToURL(ctx, url, body)
-		}(url)
+			d.deliverToEndpoint(ctx, ep, body)
+		}(ep)
 	}
 	wg.Wait()
 }
 
-func (d *MemoryDispatcher) deliverToURL(ctx context.Context, url string, body []byte) {
+func (d *MemoryDispatcher) deliverToEndpoint(ctx context.Context, ep webhook.Endpoint, body []byte) {
 	const maxAttempts = 3
 	backoff := 1 * time.Second
 
@@ -102,31 +102,36 @@ func (d *MemoryDispatcher) deliverToURL(ctx context.Context, url string, body []
 			return
 		}
 
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, ep.URL, bytes.NewReader(body))
 		if err != nil {
 			d.logger.Error("failed to create webhook request",
-				zap.String("url", url), zap.Error(err))
+				zap.String("url", ep.URL), zap.Error(err))
 			return
 		}
 		req.Header.Set("Content-Type", "application/json")
+
+		if ep.SigningKey != "" {
+			sig := webhook.Sign([]byte(ep.SigningKey), time.Now(), body)
+			req.Header.Set(webhook.SignatureHeader, sig)
+		}
 
 		resp, err := d.client.Do(req)
 		if err == nil {
 			resp.Body.Close()
 			if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 				d.logger.Debug("webhook delivered successfully",
-					zap.String("url", url),
+					zap.String("url", ep.URL),
 					zap.Int("attempt", attempt+1),
 				)
 				return
 			}
 			d.logger.Warn("webhook delivery got non-2xx",
-				zap.String("url", url),
+				zap.String("url", ep.URL),
 				zap.Int("status", resp.StatusCode),
 				zap.Int("attempt", attempt+1))
 		} else {
 			d.logger.Warn("webhook delivery failed",
-				zap.String("url", url),
+				zap.String("url", ep.URL),
 				zap.Error(err),
 				zap.Int("attempt", attempt+1))
 		}

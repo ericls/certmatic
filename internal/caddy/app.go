@@ -203,7 +203,7 @@ func (a *App) Provision(ctx caddy.Context) error {
 	switch a.WebhookDispatcher.Type {
 	case "memory":
 		a.webhookDispatcher = internalwebhook.NewMemoryDispatcher(
-			a.WebhookDispatcher.URLs,
+			a.WebhookDispatcher.Endpoints,
 			ctx.Logger(a).Named("webhook"),
 		)
 	default:
