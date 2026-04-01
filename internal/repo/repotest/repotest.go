@@ -293,7 +293,8 @@ func RunSessionStoreTests(t *testing.T, newStore func(t *testing.T) pkgsession.S
 			t.Errorf("BackText = %q, want %q", got.BackText, sess.BackText)
 		}
 		if got.OwnershipVerificationMode != sess.OwnershipVerificationMode {
-			t.Errorf("OwnershipVerificationMode = %q, want %q", got.OwnershipVerificationMode, sess.OwnershipVerificationMode)
+			t.Errorf("OwnershipVerificationMode = %q, want %q",
+				got.OwnershipVerificationMode, sess.OwnershipVerificationMode)
 		}
 		if got.VerifyOwnershipURL != sess.VerifyOwnershipURL {
 			t.Errorf("VerifyOwnershipURL = %q, want %q", got.VerifyOwnershipURL, sess.VerifyOwnershipURL)
