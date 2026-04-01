@@ -5,6 +5,9 @@
 	# Debug logging
 	debug
 
+	# this disables the automatic :80 listener, which is useless on dev
+	auto_https disable_redirects
+
 	# Configure certmatic
 	certmatic {
 		domain_store sqlite://./certmatic-dev.db
