@@ -128,7 +128,19 @@ func (a *App) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 						if !d.NextArg() {
 							return d.ArgErr()
 						}
-						a.WebhookDispatcher.URLs = append(a.WebhookDispatcher.URLs, d.Val())
+						ep := webhook.Endpoint{URL: d.Val()}
+						for d.NextBlock(2) {
+							switch d.Val() {
+							case "signing_key":
+								if !d.NextArg() {
+									return d.ArgErr()
+								}
+								ep.SigningKey = d.Val()
+							default:
+								return d.Errf("unrecognized webhook url option: %s", d.Val())
+							}
+						}
+						a.WebhookDispatcher.Endpoints = append(a.WebhookDispatcher.Endpoints, ep)
 					default:
 						return d.Errf("unrecognized webhook_dispatcher option: %s", d.Val())
 					}

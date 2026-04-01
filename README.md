@@ -52,7 +52,9 @@ Create a `Caddyfile`:
         portal_signing_key 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
         portal_base_url https://certmatic-portal.example-saas.com/
         webhook_dispatcher memory {
-            url http://upstream:8080/webhooks/certmatic
+            url http://upstream:8080/webhooks/certmatic {
+                signing_key your-webhook-secret
+            }
         }
     }
     on_demand_tls {
@@ -169,13 +171,30 @@ All options go inside a `certmatic { }` block in the Caddyfile global options:
 | `portal_signing_key`    | No        | Hex-encoded HMAC key for session tokens (min 32 hex chars). Auto-generated if omitted (auto-generated tokens won't survive restarts) |
 | `portal_base_url`       | Yes       | Full URL where the portal is accessible                                                                               |
 | `portal_assets_dir`     | No        | Serve portal UI assets from this local directory instead of the embedded build. Useful for development (point at `portal/ui/dev-build`) or to use a custom/forked portal UI. |
-| `webhook_dispatcher`    | No        | Webhook event dispatcher. Syntax: `webhook_dispatcher <queue_backend_type> { url <endpoint> }`. Currently only supports `memory` backend type. Multiple `url` lines can be specified. Events (e.g. `domain_verified`) are delivered asynchronously with retries. |
+| `webhook_dispatcher`    | No        | Webhook event dispatcher. Syntax: `webhook_dispatcher <queue_backend_type> { url <endpoint> { signing_key <key> } }`. Currently only supports `memory` backend type. Multiple `url` blocks can be specified, each with an optional `signing_key` used to sign outgoing webhook requests so receivers can verify them. Events (e.g. `domain_verified`) are delivered asynchronously with retries. See [Webhook Signatures](/docs/webhook-signature.md) for details. |
 
 Three Caddy handler directives are provided:
 
 - `certmatic_admin` — mounts the Admin API. **You must protect this with authentication** (see Caddyfile example above).
 - `certmatic_portal` — mounts the Portal (token exchange + session-scoped API + static assets)
 - `certmatic_ask` — mounts the on-demand TLS ask endpoint. Point Caddy's `on_demand_tls { ask <url> }` at this handler. Returns 200 for domains that exist in the system and are ownership-verified, 403 otherwise. Keep this on a localhost-only or private listener — do not expose it publicly.
+
+
+Each URL can have its own signing key, so different endpoints can be operated by different parties:
+
+```caddyfile
+webhook_dispatcher memory {
+    url http://service-a.internal/hooks {
+        signing_key secret-for-service-a
+    }
+    url http://service-b.internal/hooks {
+        signing_key secret-for-service-b
+    }
+    url http://service-c.internal/hooks
+}
+```
+
+URLs without a `signing_key` will not receive a signature header.
 
 ## Roadmap
 

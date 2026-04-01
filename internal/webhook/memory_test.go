@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -25,7 +26,7 @@ func TestMemoryDispatcher_DeliversEvent(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	d := NewMemoryDispatcher([]string{srv.URL}, zap.NewNop())
+	d := NewMemoryDispatcher([]webhook.Endpoint{{URL: srv.URL}}, zap.NewNop())
 	defer d.Destruct()
 
 	event := webhook.Event{
@@ -75,7 +76,7 @@ func TestMemoryDispatcher_RetriesOnFailure(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	d := NewMemoryDispatcher([]string{srv.URL}, zap.NewNop())
+	d := NewMemoryDispatcher([]webhook.Endpoint{{URL: srv.URL}}, zap.NewNop())
 	defer d.Destruct()
 
 	d.Dispatch(webhook.Event{
@@ -117,7 +118,10 @@ func TestMemoryDispatcher_MultipleURLs_FanOut(t *testing.T) {
 	}))
 	defer srv2.Close()
 
-	d := NewMemoryDispatcher([]string{srv1.URL, srv2.URL}, zap.NewNop())
+	d := NewMemoryDispatcher([]webhook.Endpoint{
+		{URL: srv1.URL},
+		{URL: srv2.URL},
+	}, zap.NewNop())
 	defer d.Destruct()
 
 	d.Dispatch(webhook.Event{
@@ -155,5 +159,86 @@ func TestMemoryDispatcher_MultipleURLs_FanOut(t *testing.T) {
 
 	if count1.Load() != 1 || count2.Load() != 1 {
 		t.Fatalf("expected 1 delivery each, got srv1=%d srv2=%d", count1.Load(), count2.Load())
+	}
+}
+
+func TestMemoryDispatcher_SignsRequests(t *testing.T) {
+	var sigHeader atomic.Value
+	var received atomic.Int32
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sigHeader.Store(r.Header.Get(webhook.SignatureHeader))
+		received.Add(1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	d := NewMemoryDispatcher([]webhook.Endpoint{
+		{URL: srv.URL, SigningKey: "test-secret-key"},
+	}, zap.NewNop())
+	defer d.Destruct()
+
+	d.Dispatch(webhook.Event{
+		Type:      webhook.EventDomainVerified,
+		Timestamp: time.Now(),
+		Data:      map[string]any{"hostname": "signed.example.com"},
+	})
+
+	deadline := time.After(2 * time.Second)
+	for received.Load() == 0 {
+		select {
+		case <-deadline:
+			t.Fatal("timed out waiting for webhook delivery")
+		default:
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+
+	sigHeaderValue := sigHeader.Load().(string)
+	if sigHeaderValue == "" {
+		t.Fatal("expected X-Certmatic-Signature header to be set")
+	}
+	if !strings.HasPrefix(sigHeaderValue, "ts_s=") {
+		t.Fatalf("signature header should start with ts_s=, got %q", sigHeader)
+	}
+	if !strings.Contains(sigHeaderValue, ",v1=") {
+		t.Fatalf("signature header should contain ,v1=, got %q", sigHeader)
+	}
+}
+
+func TestMemoryDispatcher_NoSignatureWithoutKey(t *testing.T) {
+	var sigHeader string
+	var received atomic.Int32
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sigHeader = r.Header.Get(webhook.SignatureHeader)
+		received.Add(1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	d := NewMemoryDispatcher([]webhook.Endpoint{
+		{URL: srv.URL},
+	}, zap.NewNop())
+	defer d.Destruct()
+
+	d.Dispatch(webhook.Event{
+		Type:      webhook.EventDomainVerified,
+		Timestamp: time.Now(),
+		Data:      map[string]any{"hostname": "unsigned.example.com"},
+	})
+
+	deadline := time.After(2 * time.Second)
+	for received.Load() == 0 {
+		select {
+		case <-deadline:
+			t.Fatal("timed out waiting for webhook delivery")
+		default:
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+
+	if sigHeader != "" {
+		t.Fatalf("expected no signature header, got %q", sigHeader)
 	}
 }

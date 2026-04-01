@@ -1,9 +1,15 @@
 package webhook
 
+// Endpoint pairs a webhook URL with an optional signing key.
+type Endpoint struct {
+	URL        string `json:"url"`
+	SigningKey string `json:"signing_key,omitempty"`
+}
+
 // DispatcherConfig holds the configuration for the webhook dispatcher.
 type DispatcherConfig struct {
-	Type string   `json:"type,omitempty"`
-	URLs []string `json:"urls,omitempty"`
+	Type      string     `json:"type,omitempty"`
+	Endpoints []Endpoint `json:"endpoints,omitempty"`
 }
 
 // Dispatcher delivers webhook events to configured URLs.
