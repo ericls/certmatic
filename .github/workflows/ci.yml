@@ -9,6 +9,11 @@ on:
 jobs:
   go:
     runs-on: ubuntu-latest
+    services:
+      rqlite:
+        image: rqlite/rqlite:latest
+        ports:
+          - 4001:4001
     steps:
       - uses: actions/checkout@v4
 
@@ -18,7 +23,10 @@ jobs:
 
       - run: go build ./...
 
-      - run: go test ./...
+      - name: Run tests
+        run: go test ./...
+        env:
+          TEST_RQLITE_ADDR: "http://localhost:4001?disableClusterDiscovery=true"
 
       - name: Check formatting
         run: |

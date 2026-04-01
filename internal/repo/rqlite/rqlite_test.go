@@ -21,7 +21,7 @@ import (
 
 func rqliteAddr(t *testing.T) string {
 	t.Helper()
-	addr := os.Getenv("RQLITE_ADDR")
+	addr := os.Getenv("TEST_RQLITE_ADDR")
 	if addr == "" {
 		// Disable cluster discovery by default so tests work with a single
 		// Docker container where the container's internal hostname isn't
