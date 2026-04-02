@@ -207,11 +207,11 @@ func TestMemoryDispatcher_SignsRequests(t *testing.T) {
 }
 
 func TestMemoryDispatcher_NoSignatureWithoutKey(t *testing.T) {
-	var sigHeader string
+	var sigHeader atomic.Value
 	var received atomic.Int32
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		sigHeader = r.Header.Get(webhook.SignatureHeader)
+		sigHeader.Store(r.Header.Get(webhook.SignatureHeader))
 		received.Add(1)
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -238,7 +238,8 @@ func TestMemoryDispatcher_NoSignatureWithoutKey(t *testing.T) {
 		}
 	}
 
-	if sigHeader != "" {
-		t.Fatalf("expected no signature header, got %q", sigHeader)
+	sigHeaderValue := sigHeader.Load().(string)
+	if sigHeaderValue != "" {
+		t.Fatalf("expected no signature header, got %q", sigHeaderValue)
 	}
 }
