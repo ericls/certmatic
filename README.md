@@ -172,6 +172,7 @@ All options go inside a `certmatic { }` block in the Caddyfile global options:
 | `portal_base_url`       | Yes       | Full URL where the portal is accessible                                                                               |
 | `portal_assets_dir`     | No        | Serve portal UI assets from this local directory instead of the embedded build. Useful for development (point at `portal/ui/dev-build`) or to use a custom/forked portal UI. |
 | `webhook_dispatcher`    | No        | Webhook event dispatcher. Syntax: `webhook_dispatcher <queue_backend_type> { url <endpoint> { signing_key <key> } }`. Currently only supports `memory` backend type. Multiple `url` blocks can be specified, each with an optional `signing_key` used to sign outgoing webhook requests so receivers can verify them. Events (e.g. `domain_verified`) are delivered asynchronously with retries. See [Webhook Signatures](/docs/webhook-signature.md) for details. |
+| `dns_nameserver`        | No        | UDP DNS server to use for DNS lookups (e.g. `8.8.8.8:53`). When set, Certmatic queries this server directly using Go's pure-Go resolver. If omitted, the OS system resolver is used. |
 
 Three Caddy handler directives are provided:
 

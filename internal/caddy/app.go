@@ -41,11 +41,13 @@ type App struct {
 	PortalBaseURL       string                   `json:"portal_base_url,omitempty"`
 	PortalAssetsDir     string                   `json:"portal_assets_dir,omitempty"`
 	WebhookDispatcher   webhook.DispatcherConfig `json:"webhook_dispatcher,omitempty"`
+	DNSNameserver       string                   `json:"dns_nameserver,omitempty"`
 
 	logger            zap.Logger              `json:"-"`
 	config            config.Config           `json:"-"`
 	domainRepo        domain.DomainRepo       `json:"-"`
 	dnsRecordManager  *dns.DNSRecordManager   `json:"-"`
+	lookup            dns.Lookup              `json:"-"`
 	sessionStore      pkgsession.SessionStore `json:"-"`
 	signingKeyBytes   []byte                  `json:"-"`
 	webhookDispatcher webhook.Dispatcher      `json:"-"`
@@ -177,8 +179,14 @@ func (a *App) Provision(ctx caddy.Context) error {
 	}
 	a.sessionStore = val.(pkgsession.SessionStore)
 
-	dnsRecordManager := dns.NewDNSRecordManager(a.ChallengeType, a.DNSDelegationDomain, a.CNameTarget, dns.NetLookup())
-	a.dnsRecordManager = dnsRecordManager
+	var lookup dns.Lookup
+	if a.DNSNameserver != "" {
+		lookup = dns.DirectUDPLookup(a.DNSNameserver)
+	} else {
+		lookup = dns.NetLookup()
+	}
+	a.dnsRecordManager = dns.NewDNSRecordManager(a.ChallengeType, a.DNSDelegationDomain, a.CNameTarget, lookup)
+	a.lookup = lookup
 
 	// Portal signing key
 	if a.PortalSigningKey != "" {

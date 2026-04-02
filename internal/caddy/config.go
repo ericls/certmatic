@@ -117,6 +117,11 @@ func (a *App) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 					return d.ArgErr()
 				}
 				a.PortalAssetsDir = d.Val()
+			case "dns_nameserver":
+				if !d.NextArg() {
+					return d.ArgErr()
+				}
+				a.DNSNameserver = d.Val()
 			case "webhook_dispatcher":
 				if !d.NextArg() {
 					return d.ArgErr()

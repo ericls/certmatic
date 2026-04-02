@@ -36,6 +36,7 @@ func MakePortalRouter(
 	version string,
 	logger *zap.Logger,
 	webhookDispatcher webhook.Dispatcher,
+	lookup dns.Lookup,
 ) chi.Router {
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
@@ -47,7 +48,7 @@ func MakePortalRouter(
 		certMan:           certMan,
 		certWaitTimeout:   2 * time.Minute,
 		certPollInterval:  2 * time.Second,
-		lookup:            dns.NetLookup(),
+		lookup:            lookup,
 		webhookDispatcher: webhookDispatcher,
 	}
 

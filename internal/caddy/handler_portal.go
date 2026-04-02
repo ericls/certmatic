@@ -97,6 +97,7 @@ func (h *PortalHandler) Provision(ctx caddy.Context) error {
 		version,
 		h.logger,
 		h.app.webhookDispatcher,
+		h.app.lookup,
 	)
 	h.router = chi.NewRouter()
 	h.router.Mount("/", portalRouter)
