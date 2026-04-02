@@ -82,7 +82,11 @@ export function DomainSetup({ onBackButton }: Props) {
   return (
     <>
       {showExportModal && (
-        <ExportModal records={exportRecords} onClose={() => setShowExportModal(false)} />
+        <ExportModal
+          records={exportRecords}
+          onClose={() => setShowExportModal(false)}
+          exportName={`${domain.hostname}-dns-records.txt`}
+        />
       )}
       <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
         <div>

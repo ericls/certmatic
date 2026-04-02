@@ -4,11 +4,12 @@ import { Button } from "../ui";
 import { formatZoneFile } from "../utils/formatZoneFile";
 
 interface Props {
+  exportName?: string;
   records: DNSRecord[];
   onClose: () => void;
 }
 
-export function ExportModal({ records, onClose }: Props) {
+export function ExportModal({ records, onClose, exportName }: Props) {
   const [copied, setCopied] = useState(false);
   const zoneText = formatZoneFile(records);
 
@@ -16,6 +17,16 @@ export function ExportModal({ records, onClose }: Props) {
     await navigator.clipboard.writeText(zoneText);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDownload = () => {
+    const blob = new Blob([zoneText], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = exportName ?? "dns-records.txt";
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -43,8 +54,9 @@ export function ExportModal({ records, onClose }: Props) {
             {zoneText}
           </pre>
         </div>
-        <div className="px-5 pb-4">
+        <div className="px-5 pb-4 flex gap-2">
           <Button onClick={handleCopy}>{copied ? "Copied!" : "Copy all"}</Button>
+          <Button onClick={handleDownload}>Download</Button>
         </div>
       </div>
     </div>

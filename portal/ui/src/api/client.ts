@@ -44,12 +44,8 @@ interface ApiResponse<T> {
   errors: { message: string; field?: string }[];
 }
 
-// Extract the session ID from the URL path: /portal/{sessionID}/...
 function getApiBase(): string {
-  const parts = window.location.pathname.split("/").filter(Boolean);
-  // parts[0] = "portal", parts[1] = sessionID
-  const sessionID = parts[1] ?? "";
-  return `/portal/${sessionID}/api`;
+  return `./api`;
 }
 
 async function apiRequest<T>(path: string, options?: RequestInit): Promise<T> {

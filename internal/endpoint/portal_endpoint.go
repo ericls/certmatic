@@ -51,8 +51,8 @@ func MakePortalRouter(
 		webhookDispatcher: webhookDispatcher,
 	}
 
-	// Static assets — served from embedded FS (prod) or local disk (dev).
-	r.Handle("/assets/*", http.StripPrefix("/assets", http.FileServerFS(assetsFS)))
+	assets_handler := http.StripPrefix("/assets", http.FileServerFS(assetsFS))
+	r.Mount("/assets", assets_handler)
 
 	// Root: token exchange only.
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
@@ -80,7 +80,7 @@ func MakePortalRouter(
 
 func serveIndexHTML(w http.ResponseWriter, version string) {
 	html, err := portalstatic.GenerateHTML(portalstatic.HTMLData{
-		AssetsBase: "/portal/assets/",
+		AssetsBase: "../assets/",
 		Version:    version,
 	})
 	if err != nil {
