@@ -167,7 +167,7 @@ func TestMemoryDispatcher_SignsRequests(t *testing.T) {
 	var received atomic.Int32
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		sigHeader.Store(r.Header.Get(webhook.SignatureHeader))
+		sigHeader.Store(r.Header.Get(SignatureHeader))
 		received.Add(1)
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -211,7 +211,7 @@ func TestMemoryDispatcher_NoSignatureWithoutKey(t *testing.T) {
 	var received atomic.Int32
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		sigHeader.Store(r.Header.Get(webhook.SignatureHeader))
+		sigHeader.Store(r.Header.Get(SignatureHeader))
 		received.Add(1)
 		w.WriteHeader(http.StatusOK)
 	}))

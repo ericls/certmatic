@@ -111,8 +111,8 @@ func (d *MemoryDispatcher) deliverToEndpoint(ctx context.Context, ep webhook.End
 		req.Header.Set("Content-Type", "application/json")
 
 		if ep.SigningKey != "" {
-			sig := webhook.Sign([]byte(ep.SigningKey), time.Now(), body)
-			req.Header.Set(webhook.SignatureHeader, sig)
+			sig := Sign([]byte(ep.SigningKey), time.Now(), body)
+			req.Header.Set(SignatureHeader, sig)
 		}
 
 		resp, err := d.client.Do(req)
