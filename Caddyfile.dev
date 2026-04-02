@@ -56,7 +56,7 @@
 	}
 
 	# on-demand TLS ask endpoint — keep this on an internal/localhost listener
-	handle /ask {
+	handle_path /ask {
 		certmatic_ask
 	}
 
@@ -65,7 +65,7 @@
 	}
 
 	# Webhook echo endpoint — echoes the request body back as the response.
-	handle /webhook-echo {
+	handle_path /webhook-echo {
 		respond "{http.request.body}" 200
 	}
 }
