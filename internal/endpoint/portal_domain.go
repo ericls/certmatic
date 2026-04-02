@@ -64,7 +64,8 @@ func (e *portalDomainEndpoint) handleGetDomain() http.HandlerFunc {
 			if info, _ := e.certMan.GetCertInfo(r.Context(), session.Hostname); info != nil {
 				cert = &certInfoResponse{
 					NotBefore: info.NotBefore,
-					NotAfter:  info.NotAfter, Issuer: info.Issuer,
+					NotAfter:  info.NotAfter,
+					Issuer:    info.Issuer,
 				}
 			}
 		}
@@ -168,7 +169,8 @@ func (e *portalDomainEndpoint) handleEnsureCert() http.HandlerFunc {
 					Hostname: certInfo.Hostname,
 					certInfoResponse: certInfoResponse{
 						NotBefore: certInfo.NotBefore,
-						NotAfter:  certInfo.NotAfter, Issuer: certInfo.Issuer,
+						NotAfter:  certInfo.NotAfter,
+						Issuer:    certInfo.Issuer,
 					},
 				}, nil
 			}

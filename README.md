@@ -14,6 +14,9 @@ A typical user flow looks like this:
 
 > **⚠️ Certmatic is in active development.**
 
+## Preview
+![certmatic-example.png](https://img.imgdd.com/f497cb4a-9446-4fce-9243-00a4a28e4757.png)
+
 ## Quick Start
 
 ### Build
