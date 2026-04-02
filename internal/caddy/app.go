@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/caddyserver/caddy/v2"
@@ -189,6 +190,9 @@ func (a *App) Provision(ctx caddy.Context) error {
 	a.lookup = lookup
 
 	// Portal signing key
+	if a.PortalSigningKey == "" {
+		a.PortalSigningKey = os.Getenv("CERTMATIC_PORTAL_SIGNING_KEY")
+	}
 	if a.PortalSigningKey != "" {
 		key, err := hex.DecodeString(a.PortalSigningKey)
 		if err != nil {

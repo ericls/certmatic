@@ -49,7 +49,7 @@ func (e *CertAdminEndpoint) handleCertExists() http.HandlerFunc {
 		hostname := chi.URLParam(r, "hostname")
 		exists, err := e.certMan.HasCert(r.Context(), hostname)
 		if err != nil {
-			http.Error(w, "Error checking certificate: "+err.Error(), http.StatusInternalServerError)
+			http.Error(w, "internal server error", http.StatusInternalServerError)
 			return
 		}
 		if exists {
@@ -174,7 +174,7 @@ func (e *CertAdminEndpoint) handleDeleteCert() http.HandlerFunc {
 		hostname := chi.URLParam(r, "hostname")
 		err := e.certMan.DeleteCert(r.Context(), hostname)
 		if err != nil {
-			http.Error(w, "Error deleting certificate: "+err.Error(), http.StatusInternalServerError)
+			http.Error(w, "internal server error", http.StatusInternalServerError)
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)

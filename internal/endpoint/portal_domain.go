@@ -309,7 +309,7 @@ func checkCNAME(r dns.Lookup, name, expected string) domainCheck {
 			Name:     checkNameCNAMERecord,
 			Status:   checkStatusFail,
 			Expected: expected,
-			Message:  "CNAME record not found: " + err.Error(),
+			Message:  "CNAME record not found",
 		}
 	}
 	actual := strings.TrimSuffix(cname, ".")
@@ -338,7 +338,7 @@ func checkARecord(r dns.Lookup, name, expected string) domainCheck {
 			Name:     checkNameARecord,
 			Status:   checkStatusFail,
 			Expected: expected,
-			Message:  "A record not found: " + err.Error(),
+			Message:  "\"A\" record not found",
 		}
 	}
 	for _, addr := range addrs {
@@ -348,7 +348,7 @@ func checkARecord(r dns.Lookup, name, expected string) domainCheck {
 				Status:   checkStatusOK,
 				Expected: expected,
 				Actual:   addr,
-				Message:  "A record is correctly configured.",
+				Message:  "\"A\" record is correctly configured.",
 			}
 		}
 	}
@@ -372,7 +372,7 @@ func checkTXTRecord(r dns.Lookup, name, expected string) domainCheck {
 			Name:     checkNameTXTRecord,
 			Status:   checkStatusFail,
 			Expected: expected,
-			Message:  "TXT record not found: " + err.Error(),
+			Message:  "TXT record not found",
 		}
 	}
 	for _, txt := range txts {
@@ -407,7 +407,7 @@ func checkOwnershipTXTRecord(r dns.Lookup, hostname, token string) domainCheck {
 			Name:     checkNameOwnershipTXTRecord,
 			Status:   checkStatusFail,
 			Expected: token,
-			Message:  "Ownership TXT record not found: " + err.Error(),
+			Message:  "Ownership TXT record not found",
 		}
 	}
 	for _, txt := range txts {

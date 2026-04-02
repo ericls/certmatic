@@ -85,7 +85,7 @@ func serveIndexHTML(w http.ResponseWriter, version string) {
 		Version:    version,
 	})
 	if err != nil {
-		http.Error(w, "failed to render portal HTML: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
