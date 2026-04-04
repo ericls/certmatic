@@ -40,6 +40,7 @@ export function DomainSetup({ onBackButton }: Props) {
     setPokeError(null);
     setIssuedCert(null);
     try {
+      fetch(`https://${domain.hostname}/`, { method: "HEAD" }).catch(() => {});
       const cert = await domainStore.ensureCert();
       setIssuedCert(cert);
     } catch (e: unknown) {

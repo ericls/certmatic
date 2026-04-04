@@ -168,9 +168,9 @@ All options go inside a `certmatic { }` block in the Caddyfile global options:
 | ----------------------- | --------- | --------------------------------------------------------------------------------------------------------------------- |
 | `domain_store`          | Yes       | Domain storage backend: `memory`, `sqlite://path`, or `rqlite://host:port?options`. |
 | `session_store`         | Yes       | Session storage backend: `memory`, `sqlite://path`, or `rqlite://host:port?options`. |
-| `challenge_type`        | No        | ACME challenge method: `http-01` (default) or `dns-01`. DNS-01 requires a [Caddy DNS provider plugin](https://caddyserver.com/docs/modules/) built into the binary and configured in the `tls` block. |
+| `challenge_type`        | No        | ACME challenge method: `http-01` (default) or `dns-01`. **DNS-01 is not fully supported yet.** DNS-01 would require a [Caddy DNS provider plugin](https://caddyserver.com/docs/modules/) built into the binary and configured in the `tls` block. |
 | `cname_target`          | Yes       | Domain that customer domains should point to (your ingress)                                                           |
-| `dns_delegation_domain` | If dns-01 | Domain for ACME DNS challenge delegation                                                                              |
+| `dns_delegation_domain` | If dns-01 | Domain for ACME DNS challenge delegation (**Not Supported yet.**)                                                                              |
 | `portal_signing_key`    | No        | Hex-encoded HMAC key for session tokens (min 32 hex chars). Auto-generated if omitted (auto-generated tokens won't survive restarts) |
 | `portal_base_url`       | Yes       | Full URL where the portal is accessible                                                                               |
 | `portal_assets_dir`     | No        | Serve portal UI assets from this local directory instead of the embedded build. Useful for development (point at `portal/ui/dev-build`) or to use a custom/forked portal UI. |
@@ -186,11 +186,12 @@ Three Caddy handler directives are provided:
 
 ## Roadmap
 
-- **domainconnect.org spec implementation** — allow end users to automatically configure their DNS
-- **PostgreSQL storage backend** — for deployments where PostgreSQL is already available
-- **Provider-specific DNS guides in the portal** — step-by-step instructions for popular DNS providers (Cloudflare, Route 53, GoDaddy, etc.)
-- **Ingress-friendly deployment** — support for running behind load balancers and Kubernetes ingress controllers
-- **Admin dashboard UI** — web interface for managing domains and certificates
+- **domainconnect.org spec implementation** - allow end users to automatically configure their DNS
+- **DNS-01 on-demand challenge support**
+- **PostgreSQL storage backend** - for deployments where PostgreSQL is already available
+- **Provider-specific DNS guides in the portal** - step-by-step instructions for popular DNS providers (Cloudflare, Route 53, GoDaddy, etc.)
+- **Ingress-friendly deployment** - support for running behind load balancers and Kubernetes ingress controllers
+- **Admin dashboard UI** - web interface for managing domains and certificates
 
 ## Development
 
