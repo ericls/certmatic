@@ -1,8 +1,10 @@
 # Certmatic
 
-Certmatic was born out of frustration after repeatedly implementing custom domain support for different SaaS applications. It aims to provide a managed experience for the common tasks involved.
+Certmatic was born out of frustration after repeatedly implementing custom domain support for different SaaS applications.
 
-Certmatic aims to be composable. It aims to allow users to pick whatever they need from the stack, whether it's just the portal UI, or it does the certificate obtaining without terminating TLS itself. (Some of these usage patterns are not fully supported or tested yet.)
+Certmatic is a library that gives SaaS applications a managed custom domain experience. It exposes a simple API for managing domains and creating portal sessions, handles the complexity of SSL termination, and provides a seamless portal UI that guides end users through domain ownership verification and DNS configuration.
+
+Certmatic is designed to be composable, letting you pick only what you need, whether that's just the portal UI, certificate provisioning without TLS termination, or the full stack. (Some of these usage patterns are not fully supported or tested yet.)
 
 That being said, a typical setup would include Certmatic as a plugin for the [Caddy](https://caddyserver.com) instance that serves the custom domain traffic.
 
@@ -14,8 +16,11 @@ A typical user flow looks like this:
 
 > **⚠️ Certmatic is in active development.**
 
-## Preview
-![certmatic-example.png](https://img.imgdd.com/f497cb4a-9446-4fce-9243-00a4a28e4757.png)
+## Live Example
+
+[certmatic-example-saas](https://github.com/ericls/certmatic-example-saas) is a sample Django app demonstrating how to integrate Certmatic to add custom domain support to a SaaS application.
+
+A live demo is available at [example-saas.com](https://example-saas.com) (login: `demouser` / `demouser`).
 
 ## Quick Start
 
