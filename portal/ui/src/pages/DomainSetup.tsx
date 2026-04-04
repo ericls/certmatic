@@ -7,7 +7,7 @@ import { SetupCheck } from "../components/SetupCheck";
 import { RequiredRecords } from "../components/RequiredRecords";
 import { RecordsExport } from "../components/RecordsExport";
 import { ExportModal } from "../components/ExportModal";
-import { Button, StepCard } from "../ui";
+import { Button, ExternalLinkIcon, LinkButton, StepCard } from "../ui";
 import { sanitizeUrl } from "../utils/sanitizeUrl";
 import type { DNSRecord, EnsuredCert } from "../api/client";
 
@@ -157,13 +157,23 @@ export function DomainSetup({ onBackButton }: Props) {
                 )}
               </div>
             )}
-            {(domain.cert !== null || issuedCert !== null) && domain.back_url && (
-              <a
-                href={sanitizeUrl(domain.back_url)}
-                className="inline-flex items-center gap-1 px-4 py-2 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700"
-              >
-                {domain.back_text || "Back"}
-              </a>
+            {(domain.cert !== null || issuedCert !== null) && (
+              <div className="flex items-center gap-2">
+                {domain.back_url && (
+                  <LinkButton href={sanitizeUrl(domain.back_url)}>
+                    {domain.back_text || "Back"}
+                  </LinkButton>
+                )}
+                <LinkButton
+                  href={`https://${domain.hostname}/`}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  variant="outline"
+                >
+                  Visit {domain.hostname}
+                  <ExternalLinkIcon className="ml-1" />
+                </LinkButton>
+              </div>
             )}
           </div>
         </StepCard>
