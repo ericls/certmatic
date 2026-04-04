@@ -161,7 +161,7 @@ func (e *portalDomainEndpoint) handleEnsureCert() http.HandlerFunc {
 			if err != nil {
 				return portalEnsureCertResponse{}, HTTPError{
 					Status:  http.StatusInternalServerError,
-					Message: fmt.Sprintf("error checking certificate: %v", err),
+					Message: "error checking certificate",
 				}
 			}
 			if certInfo != nil && certInfo.NotAfter.After(time.Now()) && certInfo.NotBefore.Before(time.Now()) {
