@@ -175,7 +175,7 @@ All options go inside a `certmatic { }` block in the Caddyfile global options:
 | `session_store`         | Yes       | Session storage backend: `memory`, `sqlite://path`, or `rqlite://host:port?options`. |
 | `challenge_type`        | No        | ACME challenge method: `http-01` (default) or `dns-01`. DNS-01 would require a [Caddy DNS provider plugin](https://caddyserver.com/docs/modules/) built into the binary and configured in the `tls` block. See [Example](https://github.com/ericls/certmatic-example-saas#dns-01-config). |
 | `cname_target`          | Yes       | Domain that customer domains should point to (your ingress)                                                           |
-| `dns_delegation_domain` | If dns-01 | Domain for ACME DNS challenge delegation (**Not Supported yet.**)                                                                              |
+| `dns_delegation_domain` | If dns-01 | Domain for ACME DNS challenge delegation |
 | `portal_signing_key`    | No        | Hex-encoded HMAC key for session tokens (min 32 hex chars). Auto-generated if omitted (auto-generated tokens won't survive restarts) |
 | `portal_base_url`       | Yes       | Full URL where the portal is accessible                                                                               |
 | `portal_assets_dir`     | No        | Serve portal UI assets from this local directory instead of the embedded build. Useful for development (point at `portal/ui/dev-build`) or to use a custom/forked portal UI. |
