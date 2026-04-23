@@ -105,6 +105,14 @@ func (a *App) Stop() error {
 	return nil
 }
 
+func replaceStoreConfig(repl *caddy.Replacer, s *config.Store) {
+	for k, v := range s.Config {
+		if str, ok := v.(string); ok {
+			s.Config[k] = repl.ReplaceAll(str, "")
+		}
+	}
+}
+
 func loadFromPool(
 	pool *caddy.UsagePool,
 	conf config.Store,
@@ -151,6 +159,21 @@ func loadFromPool(
 func (a *App) Provision(ctx caddy.Context) error {
 	a.logger = *ctx.Logger(a)
 	a.logger.Debug("provisioning certmatic app")
+
+	repl := caddy.NewReplacer()
+	a.DNSDelegationDomain = repl.ReplaceAll(a.DNSDelegationDomain, "")
+	a.CNameTarget = repl.ReplaceAll(a.CNameTarget, "")
+	a.PortalSigningKey = repl.ReplaceAll(a.PortalSigningKey, "")
+	a.PortalBaseURL = repl.ReplaceAll(a.PortalBaseURL, "")
+	a.PortalAssetsDir = repl.ReplaceAll(a.PortalAssetsDir, "")
+	a.DNSNameserver = repl.ReplaceAll(a.DNSNameserver, "")
+	replaceStoreConfig(repl, &a.DomainStore)
+	replaceStoreConfig(repl, &a.SessionStore)
+	for i := range a.WebhookDispatcher.Endpoints {
+		ep := &a.WebhookDispatcher.Endpoints[i]
+		ep.URL = repl.ReplaceAll(ep.URL, "")
+		ep.SigningKey = repl.ReplaceAll(ep.SigningKey, "")
+	}
 
 	// --- Domain repo ---
 	val, err := loadFromPool(usagePool, a.DomainStore, "domainRepo",
