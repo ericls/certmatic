@@ -14,6 +14,10 @@ import (
 	"go.uber.org/zap"
 )
 
+// AdminHandler is the Caddy HTTP handler that exposes Certmatic's
+// admin API. It is intended to be mounted on a protected route
+// (behind authentication and/or a private listener) and depends on the
+// top-level "certmatic" app for shared state.
 type AdminHandler struct {
 	app    *App
 	logger *zap.Logger

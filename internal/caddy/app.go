@@ -32,17 +32,68 @@ func init() {
 	httpcaddyfile.RegisterGlobalOption("certmatic", parseGlobalCertmatic)
 }
 
+// Certmatic Caddy app. It provides a managed experience for SaaS
+// platforms to provide custom domain support. It also includes a
+// end-user portal that guides them through the process of
+// configuring their DNS and obtaining TLS certificates for their domains.
+//
+// It is configured under the top-level "certmatic" app key in JSON,
+// or via the `certmatic { ... }` global option in the Caddyfile. The
+// HTTP handlers in this module ([AdminHandler], [AskHandler],
+// [PortalHandler]) all read shared state from this app.
 type App struct {
-	DomainStore         config.Store             `json:"domain_store,omitempty"`
-	SessionStore        config.Store             `json:"session_store,omitempty"`
-	ChallengeType       dns.ChallengeType        `json:"challenge_type,omitempty"`
-	DNSDelegationDomain string                   `json:"dns_delegation_domain,omitempty"`
-	CNameTarget         string                   `json:"cname_target,omitempty"`
-	PortalSigningKey    string                   `json:"portal_signing_key,omitempty"`
-	PortalBaseURL       string                   `json:"portal_base_url,omitempty"`
-	PortalAssetsDir     string                   `json:"portal_assets_dir,omitempty"`
-	WebhookDispatcher   webhook.DispatcherConfig `json:"webhook_dispatcher,omitempty"`
-	DNSNameserver       string                   `json:"dns_nameserver,omitempty"`
+	// DomainStore configures persistence for tenant domain records.
+	// Supported types are "memory" (default), "sqlite", and "rqlite".
+	// The "config" sub-object holds type-specific settings (e.g.
+	// "file_path" for sqlite, "http_addr" for rqlite).
+	DomainStore config.Store `json:"domain_store"`
+
+	// SessionStore configures persistence for portal authenticated sessions.
+	// Accepts the same store types as DomainStore.
+	SessionStore config.Store `json:"session_store"`
+
+	// ChallengeType selects the ACME challenge used when issuing
+	// certificates. One of "http-01" or "dns-01". When set to
+	// "dns-01", DNSDelegationDomain and CNameTarget control the
+	// CNAME-delegation flow so tenants don't need to grant DNS
+	// credentials.
+	ChallengeType dns.ChallengeType `json:"challenge_type,omitempty"`
+
+	// DNSDelegationDomain is the parent zone Certmatic controls and
+	// writes _acme-challenge records into when using DNS-01
+	// delegation (e.g. "acme.example-saas.com"). Tenants CNAME their own
+	// _acme-challenge.<domain> records to a subdomain of this zone.
+	DNSDelegationDomain string `json:"dns_delegation_domain,omitempty"`
+
+	// CNameTarget is the hostname tenants are instructed to CNAME
+	// their domains to so traffic reaches this Caddy instance
+	// (e.g. "edge.example-saas.com"). Surfaced in the portal UI.
+	CNameTarget string `json:"cname_target,omitempty"`
+
+	// PortalSigningKey is the secret used to sign portal session
+	// tokens. Must be a stable, sufficiently random string; rotating
+	// it invalidates all existing portal sessions. Supports Caddy
+	// replacer placeholders (e.g. "{env.CERTMATIC_PORTAL_KEY}").
+	PortalSigningKey string `json:"portal_signing_key,omitempty"`
+
+	// PortalBaseURL is the externally reachable base URL of the
+	// portal (e.g. "https://certmatic.example-saas.com"). Used to build
+	// absolute links in emails and redirects.
+	PortalBaseURL string `json:"portal_base_url,omitempty"`
+
+	// PortalAssetsDir, if set, serves the portal UI from this
+	// filesystem directory instead of the binary's embedded assets.
+	PortalAssetsDir string `json:"portal_assets_dir,omitempty"`
+
+	// WebhookDispatcher configures outbound webhooks fired on
+	// lifecycle events (domain added, certificate issued/renewed,
+	// etc.). See [webhook.DispatcherConfig] for endpoint settings.
+	WebhookDispatcher webhook.DispatcherConfig `json:"webhook_dispatcher"`
+
+	// DNSNameserver overrides the resolver used for DNS lookups
+	// performed during domain validation (e.g. "1.1.1.1:53"). When
+	// empty, the system resolver is used.
+	DNSNameserver string `json:"dns_nameserver,omitempty"`
 
 	logger            zap.Logger              `json:"-"`
 	config            config.Config           `json:"-"`

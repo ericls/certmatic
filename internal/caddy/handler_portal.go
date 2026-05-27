@@ -17,13 +17,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// PortalHandler is the Caddy module for the customer-facing portal.
-//
-// Caddyfile usage:
-//
-//	certmatic_portal
-//
-// Dev mode is enabled by setting portal_dev_dir in the global certmatic block.
+// PortalHandler serves Certmatic's end-user portal: the web UI and JSON API where end users
+// get authenticated, walk trough step-by-step guides for configuring their DNS and obtaining TLS certificates.
 type PortalHandler struct {
 	app    *App
 	logger *zap.Logger

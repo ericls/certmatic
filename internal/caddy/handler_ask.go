@@ -10,6 +10,9 @@ import (
 	"github.com/ericls/certmatic/internal/endpoint"
 )
 
+// AskHandler implements the endpoint queried by Caddy's on-demand TLS "ask" mechanism.
+// You can use this endpoint or write your own.
+// (If you write your own, domain verification status can be queried or notified via the webhook)
 type AskHandler struct {
 	app     *App
 	handler *endpoint.AskEndpoint
