@@ -163,6 +163,22 @@ curl -X POST https://certmatic-internal.example-saas.com/admin/portal/sessions \
 # Returns: { "data": { "url": "https://certmatic-portal.example-saas.com/?token=...", "expires_at": "..." } }
 ```
 
+Optional `cert_issuance_mode` controls what "success" means in the portal:
+
+- `"in_portal"` (default) — the portal issues the certificate as the final step and waits for it to be ready before showing the "Back" button.
+- `"skip"` — the portal declares success as soon as ownership is verified and the required DNS records validate. The certificate step is hidden and the user is sent back immediately. Use this when the certificate is issued out-of-band (later, elsewhere, or by another system).
+
+```bash
+curl -X POST https://certmatic-internal.example-saas.com/admin/portal/sessions \
+  -d '{
+    "hostname": "custom.example.com",
+    "ownership_verification_mode": "dns_challenge",
+    "cert_issuance_mode": "skip",
+    "back_url": "https://example-saas.com/settings/custom-domain",
+    "back_text": "Back to settings"
+  }'
+```
+
 Redirect your customer to the returned URL. The portal guides them through ownership verification and DNS configuration.
 
 ## Configuration Reference

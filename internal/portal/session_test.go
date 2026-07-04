@@ -120,7 +120,7 @@ func TestMemorySessionStore_RedeemToken_Success(t *testing.T) {
 
 	key := []byte("signing-key")
 	token, _, err := CreateToken(store, key, "example.com", time.Hour, "", "",
-		pkgsession.OwnershipVerificationModeDNSChallenge, "", "")
+		pkgsession.OwnershipVerificationModeDNSChallenge, "", "", "")
 	if err != nil {
 		t.Fatalf("CreateToken failed: %v", err)
 	}
@@ -140,7 +140,7 @@ func TestMemorySessionStore_RedeemToken_Replay(t *testing.T) {
 
 	key := []byte("signing-key")
 	token, _, _ := CreateToken(store, key, "example.com", time.Hour, "", "",
-		pkgsession.OwnershipVerificationModeDNSChallenge, "", "")
+		pkgsession.OwnershipVerificationModeDNSChallenge, "", "", "")
 
 	store.RedeemToken(key, token) // first use
 	_, err := store.RedeemToken(key, token)
@@ -155,7 +155,7 @@ func TestMemorySessionStore_RedeemToken_Expired(t *testing.T) {
 
 	key := []byte("signing-key")
 	token, _, _ := CreateToken(store, key, "example.com", -time.Second, "", "",
-		pkgsession.OwnershipVerificationModeDNSChallenge, "", "")
+		pkgsession.OwnershipVerificationModeDNSChallenge, "", "", "")
 
 	_, err := store.RedeemToken(key, token)
 	if err != pkgsession.ErrExpiredToken {
@@ -206,6 +206,7 @@ func TestCreateToken_SessionContents(t *testing.T) {
 		pkgsession.OwnershipVerificationModeProviderManaged,
 		"https://app.example.com/verify",
 		"Verify Ownership",
+		pkgsession.CertIssuanceModeSkip,
 	)
 	if err != nil {
 		t.Fatalf("CreateToken failed: %v", err)
@@ -229,5 +230,8 @@ func TestCreateToken_SessionContents(t *testing.T) {
 	}
 	if sess.VerifyOwnershipURL != "https://app.example.com/verify" {
 		t.Errorf("unexpected verify URL %q", sess.VerifyOwnershipURL)
+	}
+	if sess.CertIssuanceMode != pkgsession.CertIssuanceModeSkip {
+		t.Errorf("unexpected cert issuance mode %q", sess.CertIssuanceMode)
 	}
 }

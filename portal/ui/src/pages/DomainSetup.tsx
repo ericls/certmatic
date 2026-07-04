@@ -9,7 +9,7 @@ import { RecordsExport } from "../components/RecordsExport";
 import { ExportModal } from "../components/ExportModal";
 import { Button, ExternalLinkIcon, LinkButton, StepCard } from "../ui";
 import { sanitizeUrl } from "../utils/sanitizeUrl";
-import type { DNSRecord, EnsuredCert } from "../api/client";
+import type { DNSRecord, DomainCheckReport, EnsuredCert } from "../api/client";
 
 interface Props {
   onBackButton: (back: { url: string; text: string } | null) => void;
@@ -24,6 +24,7 @@ export function DomainSetup({ onBackButton }: Props) {
   const [poking, setPoking] = useState(false);
   const [pokeError, setPokeError] = useState<string | null>(null);
   const [issuedCert, setIssuedCert] = useState<EnsuredCert | null>(null);
+  const [checkReport, setCheckReport] = useState<DomainCheckReport | null>(null);
 
   useEffect(() => {
     domainStore.load();
@@ -71,7 +72,10 @@ export function DomainSetup({ onBackButton }: Props) {
 
   const domain = storeState.domain;
   const isDnsChallenge = domain.ownership_verification_mode === "dns_challenge";
+  const skipCert = domain.cert_issuance_mode === "skip";
   const ownershipDone = domain.ownership_verified || domain.cert !== null;
+  const dnsOnlyReady = skipCert && domain.ownership_verified && checkReport?.overall === "ok";
+  const showBackRow = domain.cert !== null || issuedCert !== null || dnsOnlyReady;
 
   const exportRecords: DNSRecord[] =
     isDnsChallenge && domain.ownership_txt_record
@@ -134,56 +138,78 @@ export function DomainSetup({ onBackButton }: Props) {
           </div>
         </StepCard>
 
-        <StepCard n={3} title="Certificate">
-          <div className="space-y-3">
-            <CertStatusCard
-              cert={domain.cert}
-              ownershipVerified={domain.ownership_verified}
-              isIssuing={poking}
-            />
-            {domain.ownership_verified && domain.cert === null && (
-              <div>
-                <Button onClick={handleEnsureCert} disabled={poking}>
-                  {poking ? "Issuing…" : "Issue certificate"}
-                </Button>
-                {pokeError && (
-                  <p className="mt-2 text-sm text-red-600 dark:text-red-400">{pokeError}</p>
-                )}
-                {issuedCert && (
-                  <p className="mt-2 text-sm text-green-600 dark:text-green-400">
-                    Certificate issued. Valid until{" "}
-                    {new Date(issuedCert.not_after).toLocaleDateString()}.
-                  </p>
-                )}
-              </div>
-            )}
-            {(domain.cert !== null || issuedCert !== null) && (
-              <div className="flex items-center gap-2">
-                {domain.back_url && (
-                  <LinkButton href={sanitizeUrl(domain.back_url)}>
-                    {domain.back_text || "Back"}
+        {!skipCert && (
+          <StepCard n={3} title="Certificate">
+            <div className="space-y-3">
+              <CertStatusCard
+                cert={domain.cert}
+                ownershipVerified={domain.ownership_verified}
+                isIssuing={poking}
+              />
+              {domain.ownership_verified && domain.cert === null && (
+                <div>
+                  <Button onClick={handleEnsureCert} disabled={poking}>
+                    {poking ? "Issuing…" : "Issue certificate"}
+                  </Button>
+                  {pokeError && (
+                    <p className="mt-2 text-sm text-red-600 dark:text-red-400">{pokeError}</p>
+                  )}
+                  {issuedCert && (
+                    <p className="mt-2 text-sm text-green-600 dark:text-green-400">
+                      Certificate issued. Valid until{" "}
+                      {new Date(issuedCert.not_after).toLocaleDateString()}.
+                    </p>
+                  )}
+                </div>
+              )}
+              {showBackRow && (
+                <div className="flex items-center gap-2">
+                  {domain.back_url && (
+                    <LinkButton href={sanitizeUrl(domain.back_url)}>
+                      {domain.back_text || "Back"}
+                    </LinkButton>
+                  )}
+                  <LinkButton
+                    href={`https://${domain.hostname}/`}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    variant="outline"
+                  >
+                    Visit {domain.hostname}
+                    <ExternalLinkIcon className="ml-1" />
                   </LinkButton>
-                )}
-                <LinkButton
-                  href={`https://${domain.hostname}/`}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  variant="outline"
-                >
-                  Visit {domain.hostname}
-                  <ExternalLinkIcon className="ml-1" />
-                </LinkButton>
-              </div>
-            )}
-          </div>
-        </StepCard>
+                </div>
+              )}
+            </div>
+          </StepCard>
+        )}
 
         <SetupCheck
           // Invalidates the setup check state when cert changes
           key={issuedCert?.not_after ?? "no-cert"}
           certIsNull={domain.cert === null}
-          onEnsureCert={handleEnsureCert}
+          onEnsureCert={skipCert ? undefined : handleEnsureCert}
+          onReport={skipCert ? setCheckReport : undefined}
         />
+
+        {skipCert && showBackRow && (
+          <div className="flex items-center gap-2">
+            {domain.back_url && (
+              <LinkButton href={sanitizeUrl(domain.back_url)}>
+                {domain.back_text || "Back"}
+              </LinkButton>
+            )}
+            <LinkButton
+              href={`https://${domain.hostname}/`}
+              target="_blank"
+              rel="noreferrer noopener"
+              variant="outline"
+            >
+              Visit {domain.hostname}
+              <ExternalLinkIcon className="ml-1" />
+            </LinkButton>
+          </div>
+        )}
       </div>
     </>
   );

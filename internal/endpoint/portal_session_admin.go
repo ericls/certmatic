@@ -37,6 +37,7 @@ type createPortalSessionRequest struct {
 	OwnershipVerificationMode pkgsession.OwnershipVerificationMode `json:"ownership_verification_mode"`
 	VerifyOwnershipURL        string                               `json:"verify_ownership_url" validate:"omitempty,http_url,max=2048"`
 	VerifyOwnershipText       string                               `json:"verify_ownership_text" validate:"omitempty,max=256"`
+	CertIssuanceMode          pkgsession.CertIssuanceMode          `json:"cert_issuance_mode" validate:"omitempty,oneof=in_portal skip"`
 }
 
 type createPortalSessionResponse struct {
@@ -59,7 +60,8 @@ func (e *portalSessionAdminEndpoint) handleCreateSession() http.HandlerFunc {
 
 		token, expiresAt, err := portal.CreateToken(e.sessionStore, e.signingKey,
 			body.Hostname, 60*time.Minute, body.BackURL, body.BackText,
-			body.OwnershipVerificationMode, body.VerifyOwnershipURL, body.VerifyOwnershipText)
+			body.OwnershipVerificationMode, body.VerifyOwnershipURL, body.VerifyOwnershipText,
+			body.CertIssuanceMode)
 		if err != nil {
 			return createPortalSessionResponse{}, err
 		}

@@ -6,10 +6,11 @@ import { Button } from "../ui";
 
 interface Props {
   certIsNull: boolean;
-  onEnsureCert: () => Promise<void>;
+  onEnsureCert?: () => Promise<void>;
+  onReport?: (report: DomainCheckReport) => void;
 }
 
-export function SetupCheck({ certIsNull, onEnsureCert }: Props) {
+export function SetupCheck({ certIsNull, onEnsureCert, onReport }: Props) {
   const [checkReport, setCheckReport] = useState<DomainCheckReport | null>(null);
   const [checking, setChecking] = useState(false);
   const [checkError, setCheckError] = useState<string | null>(null);
@@ -21,7 +22,8 @@ export function SetupCheck({ certIsNull, onEnsureCert }: Props) {
       const report = await domainStore.runDomainCheck();
       setChecking(false);
       setCheckReport(report);
-      if (report.overall === "pending" && certIsNull) {
+      onReport?.(report);
+      if (onEnsureCert && report.overall === "pending" && certIsNull) {
         await onEnsureCert();
       }
     } catch (e: unknown) {

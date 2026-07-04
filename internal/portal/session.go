@@ -15,6 +15,7 @@ import (
 func CreateToken(store pkgsession.SessionStore, signingKey []byte, hostname string, ttl time.Duration,
 	backURL, backText string, ownershipMode pkgsession.OwnershipVerificationMode,
 	verifyOwnershipURL, verifyOwnershipText string,
+	certIssuanceMode pkgsession.CertIssuanceMode,
 ) (string, time.Time, error) {
 	sessionID, err := uuid.NewRandom()
 	if err != nil {
@@ -30,6 +31,7 @@ func CreateToken(store pkgsession.SessionStore, signingKey []byte, hostname stri
 		OwnershipVerificationMode: ownershipMode,
 		VerifyOwnershipURL:        verifyOwnershipURL,
 		VerifyOwnershipText:       verifyOwnershipText,
+		CertIssuanceMode:          certIssuanceMode,
 	}
 	if err := store.StoreSession(sess); err != nil {
 		return "", time.Time{}, fmt.Errorf("store session: %w", err)

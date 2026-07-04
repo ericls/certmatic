@@ -21,6 +21,7 @@ export interface DomainInfo {
   ownership_txt_record?: DNSRecord;
   verify_ownership_url?: string;
   verify_ownership_text?: string;
+  cert_issuance_mode?: "in_portal" | "skip";
 }
 
 export type CheckStatus = "ok" | "fail" | "pending";

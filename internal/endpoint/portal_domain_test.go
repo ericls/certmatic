@@ -545,6 +545,71 @@ func TestPortalDomainCheck_CertPending_OwnershipVerified(t *testing.T) {
 	}
 }
 
+func TestPortalDomainCheck_SkipCertMode_OmitsCertCheck(t *testing.T) {
+	repo := domainrepo.NewInMemoryDomainRepo("test")
+	repo.Set(context.Background(), &domain.Domain{
+		Hostname:          "sub.tenant.com",
+		OwnershipVerified: true,
+	})
+	// certMan present but should not be consulted in skip mode.
+	cm := &mockCertMan{
+		hasCertFn: func(_ context.Context, _ string) (bool, error) {
+			t.Error("HasCert should not be called in skip mode")
+			return false, nil
+		},
+	}
+	lookup := &mockLookup{
+		lookupCNAMEFn: func(_ string) (string, error) { return "proxy.saas.internal.", nil },
+	}
+	e := newPortalTestEndpointWithLookup(repo, cm, lookup)
+
+	session := &pkgsession.Session{
+		SessionID:                 "test-session",
+		Hostname:                  "sub.tenant.com",
+		ExpiresAt:                 time.Now().Add(time.Hour),
+		OwnershipVerificationMode: pkgsession.OwnershipVerificationModeProviderManaged,
+		CertIssuanceMode:          pkgsession.CertIssuanceModeSkip,
+	}
+	req := withSession(httptest.NewRequest(http.MethodPost, "/", nil), session)
+	rec := httptest.NewRecorder()
+	e.handleDomainCheck().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected %d, got %d", http.StatusOK, rec.Code)
+	}
+	resp := decodeData[domainCheckResponse](t, rec)
+	if c := findCheck(resp.Checks, checkNameCertificate); c != nil {
+		t.Errorf("expected no certificate check in skip mode, got %+v", c)
+	}
+	if resp.Overall != checkStatusOK {
+		t.Errorf("expected overall=ok (ownership verified + no cert check), got %q", resp.Overall)
+	}
+}
+
+func TestPortalGetDomain_SkipCertMode_ExposedInResponse(t *testing.T) {
+	repo := domainrepo.NewInMemoryDomainRepo("test")
+	repo.Set(context.Background(), &domain.Domain{Hostname: "sub.tenant.com"})
+	e := newPortalTestEndpoint(repo, nil)
+
+	session := &pkgsession.Session{
+		SessionID:        "test-session",
+		Hostname:         "sub.tenant.com",
+		ExpiresAt:        time.Now().Add(time.Hour),
+		CertIssuanceMode: pkgsession.CertIssuanceModeSkip,
+	}
+	req := withSession(httptest.NewRequest(http.MethodGet, "/", nil), session)
+	rec := httptest.NewRecorder()
+	e.handleGetDomain().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected %d, got %d", http.StatusOK, rec.Code)
+	}
+	resp := decodeData[portalDomainResponse](t, rec)
+	if resp.CertIssuanceMode != pkgsession.CertIssuanceModeSkip {
+		t.Errorf("expected cert_issuance_mode=skip in response, got %q", resp.CertIssuanceMode)
+	}
+}
+
 // --- checkCNAME / checkARecord / checkTXTRecord / checkOwnershipTXTRecord ---
 
 func TestCheckCNAME_Match(t *testing.T) {

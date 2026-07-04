@@ -42,6 +42,7 @@ type portalDomainResponse struct {
 	OwnershipTXTRecord        *domain.DNSRecord                    `json:"ownership_txt_record,omitempty"`
 	VerifyOwnershipURL        string                               `json:"verify_ownership_url,omitempty"`
 	VerifyOwnershipText       string                               `json:"verify_ownership_text,omitempty"`
+	CertIssuanceMode          pkgsession.CertIssuanceMode          `json:"cert_issuance_mode,omitempty"`
 }
 
 func (e *portalDomainEndpoint) handleGetDomain() http.HandlerFunc {
@@ -78,6 +79,7 @@ func (e *portalDomainEndpoint) handleGetDomain() http.HandlerFunc {
 			BackURL:                   session.BackURL,
 			BackText:                  session.BackText,
 			OwnershipVerificationMode: session.OwnershipVerificationMode,
+			CertIssuanceMode:          session.EffectiveCertIssuanceMode(),
 		}
 		switch session.OwnershipVerificationMode {
 		case pkgsession.OwnershipVerificationModeDNSChallenge:
@@ -268,29 +270,32 @@ func (e *portalDomainEndpoint) handleDomainCheck() http.HandlerFunc {
 			})
 		}
 
-		// Certificate check.
-		hasCert := false
-		if e.certMan != nil {
-			hasCert, _ = e.certMan.HasCert(r.Context(), hostname)
-		}
-		if hasCert {
-			checks = append(checks, domainCheck{
-				Name:    checkNameCertificate,
-				Status:  checkStatusOK,
-				Message: "Certificate is issued and valid.",
-			})
-		} else if !sd.Domain.OwnershipVerified {
-			checks = append(checks, domainCheck{
-				Name:    checkNameCertificate,
-				Status:  checkStatusPending,
-				Message: "Certificate not yet issued. Ownership verification is required first.",
-			})
-		} else {
-			checks = append(checks, domainCheck{
-				Name:    checkNameCertificate,
-				Status:  checkStatusPending,
-				Message: "Certificate issuance in progress.",
-			})
+		// Certificate check. Skipped when the session opts out of in-portal issuance —
+		// the portal declares success purely on ownership + DNS records in that mode.
+		if session.EffectiveCertIssuanceMode() != pkgsession.CertIssuanceModeSkip {
+			hasCert := false
+			if e.certMan != nil {
+				hasCert, _ = e.certMan.HasCert(r.Context(), hostname)
+			}
+			if hasCert {
+				checks = append(checks, domainCheck{
+					Name:    checkNameCertificate,
+					Status:  checkStatusOK,
+					Message: "Certificate is issued and valid.",
+				})
+			} else if !sd.Domain.OwnershipVerified {
+				checks = append(checks, domainCheck{
+					Name:    checkNameCertificate,
+					Status:  checkStatusPending,
+					Message: "Certificate not yet issued. Ownership verification is required first.",
+				})
+			} else {
+				checks = append(checks, domainCheck{
+					Name:    checkNameCertificate,
+					Status:  checkStatusPending,
+					Message: "Certificate issuance in progress.",
+				})
+			}
 		}
 
 		overall := overallStatus(checks)
